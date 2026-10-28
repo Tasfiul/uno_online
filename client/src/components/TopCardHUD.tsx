@@ -150,16 +150,16 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
             <VoiceChatBar roomId={roomId} className="flex items-center" />
           </div>
 
-          {/* Right: Action Controls (CHECK, CALL UNO, CHAT, QUIT) */}
-          <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 justify-end shrink-0">
-            {/* CALL CHECK Button (Shield icon completely removed as requested!) */}
+          {/* Right: Action Controls (CHECK, CALL UNO, CHAT) */}
+          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 justify-end shrink-0">
+            {/* CALL CHECK Button */}
             <button
               onClick={() => {
                 sounds.playCheck();
                 onCallCheck();
               }}
               title="Call Check if someone with 1 card forgot to call UNO"
-              className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-200 hover:text-white font-black text-[10px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-200 hover:text-white font-black text-[11px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
             >
               <span>CHECK</span>
             </button>
@@ -171,7 +171,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onCallUno();
               }}
               title="Call UNO"
-              className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-amber-200 font-black text-[10px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-amber-200 font-black text-[11px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
             >
               <span>CALL UNO</span>
             </button>
@@ -183,7 +183,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onToggleChat();
               }}
               title="Toggle Live Chat"
-              className="p-1 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-300 hover:text-white font-bold text-xs shadow-md flex items-center gap-1 transition-all active:scale-95"
+              className="p-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-300 hover:text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95"
             >
               <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
               <span className="hidden sm:inline text-xs">Chat</span>
@@ -191,20 +191,22 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 animate-ping" />
               )}
             </button>
-
-            {/* QUIT MATCH Button */}
-            <button
-              onClick={() => {
-                sounds.playClick();
-                setShowQuitModal(true);
-              }}
-              title="Quit Match and return to Lobby"
-              className="p-1 sm:px-2.5 sm:py-2 rounded-lg sm:rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 hover:text-red-200 font-bold text-xs shadow-md flex items-center gap-1 transition-all active:scale-95"
-            >
-              <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
-              <span className="hidden sm:inline text-xs">Quit</span>
-            </button>
           </div>
+        </div>
+
+        {/* Repositioned Quit Button: Free space directly beneath top-left card widget (Zero collisions, spacious & easy to press) */}
+        <div className="pointer-events-auto fixed top-[56px] sm:top-[80px] left-1 sm:left-3 z-30">
+          <button
+            onClick={() => {
+              sounds.playClick();
+              setShowQuitModal(true);
+            }}
+            title="Quit Match and return to Lobby"
+            className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 hover:border-red-400 text-red-300 hover:text-red-200 font-bold text-[10px] sm:text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+          >
+            <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <span>Quit</span>
+          </button>
         </div>
 
         {/* Tier 2: Centered Turn Alert Banner & Action Message */}
