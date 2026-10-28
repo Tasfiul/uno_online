@@ -1,0 +1,18 @@
+{
+  "name": "uno_online",
+  "version": "1.0.0",
+  "description": "3D Online Multiplayer UNO with Live Voice Chat and WebRTC",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build:server": "npm run build --prefix server",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run build:server && npm run build:client",
+    "start": "npm run start --prefix server"
+  },
+  "keywords": ["uno", "multiplayer", "threejs", "webrtc", "socketio", "react"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

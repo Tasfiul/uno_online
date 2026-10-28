@@ -1,0 +1,13 @@
+# This is an Online mutiplayer Uno game with live voice chat##
+
+*The game will have below feature*
+*To play a match, an user must create an account. The account will have simply a username, password and optional profile picture. as for the password, the form will also have a confirm password section. Usernames must be unique.*
+*An user will be able to host a game / room or join an existing one*
+*When hosting a room, the creator will set the name. He can also make it public or private. In case of public the room will be visible to all users. In case of private, the room will not be visible to all users and will require the creator  to set a password for the room. Then a user can join the room using a button called : "Join Game with password" and it will directly join the room after adding the correct password. also, active private rooms must have unique password.*
+*The lobby will have optional live voicechat button. Also a live message button.
+They can mute or disable them anytime.*
+*The Rule will be the standard rules of UNO. There will be a button for calling UNO and there will be a button for calling check when another person doesnt say uno. The butons will always be present after the match starts. Saying uno or check is optional and there will be no penalty for not saying it. However if another person notices that someone should have said uno and hence says check correctly, the person who didnt say uno will be penalized by standard rules.*
+
+*The game will use three.js. The game should look 3d with the other players avatars being visible with holding their card in front of them. It should be clearly visible how many cards the players are holding. The players can look around and see other players sitting in a circular fashion. There should be a a button for taking a card in the players turn. When its the players turn, the playable cards should be highlighted while the invalid ones will be somewhat grayed out indicating unplayable. There should be a button for showing the cards in hand and to close the hand so taht the player can look around other players. When a player plays a card, there should be an animation showing the player putting taht card into the board. The topmost card will be visible as a card on the screen for better visibility.*
+
+*You are free to use whatever stack you feel is necessary to run the game properly. as for for the players, i want to use a mongodb atlas cluster url. Use typescript, and use nice colors and animations for the visuals. Keep everuything lighweight as this will need to run on mobiles too so build a responsive design.*
