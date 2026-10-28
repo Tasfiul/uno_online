@@ -78,7 +78,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
 
         if (result.engine) {
           if (result.engine.state.status === 'playing') {
-            result.engine.state.lastActionMessage = `✨ ${result.player.username} reconnected to the match!`;
+            result.engine.state.lastActionMessage = ` ${result.player.username} reconnected to the match!`;
           }
           // Immediately send sanitized game state to the reconnected player
           const sanitized = result.engine.getSanitizedStateForPlayer(socket.id);
