@@ -205,21 +205,21 @@ function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): T
   return texture;
 }
 
-// Procedural 2D Glassmorphic Badge Texture for Floating Player Info
+// Procedural 2D Glassmorphic Badge Texture for Floating Player Info (Overhead Name Title)
 function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 384;
-  canvas.height = 160;
+  canvas.height = 120;
   const ctx = canvas.getContext('2d')!;
 
   // Background rounded capsule
-  ctx.fillStyle = isTurn ? 'rgba(2, 132, 199, 0.94)' : 'rgba(15, 23, 42, 0.88)';
+  ctx.fillStyle = isTurn ? 'rgba(2, 132, 199, 0.94)' : 'rgba(15, 23, 42, 0.90)';
   ctx.beginPath();
-  ctx.roundRect(12, 12, 360, 136, 32);
+  ctx.roundRect(10, 10, 364, 100, 26);
   ctx.fill();
 
   // Border (Gold when turn active)
-  ctx.lineWidth = isTurn ? 6 : 3;
+  ctx.lineWidth = isTurn ? 5 : 3;
   ctx.strokeStyle = isTurn ? '#facc15' : 'rgba(255, 255, 255, 0.25)';
   ctx.stroke();
 
@@ -228,19 +228,14 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
     ctx.fillStyle = '#facc15';
     ctx.font = 'bold 20px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('★ CURRENT TURN ★', 192, 42);
+    ctx.fillText('★ CURRENT TURN ★', 192, 38);
   }
 
   // Username
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 32px sans-serif';
+  ctx.font = 'bold 36px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(player.username, 192, isTurn ? 82 : 66);
-
-  // Card count badge
-  ctx.fillStyle = isTurn ? '#fef08a' : '#94a3b8';
-  ctx.font = 'bold 26px sans-serif';
-  ctx.fillText(`🂠 ${player.cardCount} card${player.cardCount === 1 ? '' : 's'}`, 192, isTurn ? 122 : 112);
+  ctx.fillText(player.username, 192, isTurn ? 84 : 68);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
@@ -555,8 +550,8 @@ function createHumanoidPlayerModel(
   const badgeTex = createBadgeTexture(player, isTurn);
   const spriteMat = new THREE.SpriteMaterial({ map: badgeTex });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.position.set(0, 2.55, 0);
-  sprite.scale.set(2.2, 0.95, 1);
+  sprite.position.set(0, 2.45, 0);
+  sprite.scale.set(2.2, 0.69, 1);
   group.add(sprite);
 
   return {
@@ -1162,7 +1157,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         }
 
         // Update turn glow halo, LED status rings, and badge texture
-        if (existingRig.isTurn !== isTurn || existingRig.cardCount !== player.cardCount) {
+        if (existingRig.isTurn !== isTurn) {
           existingRig.isTurn = isTurn;
           existingRig.halo.visible = isTurn;
           (existingRig.leftRing.material as THREE.MeshBasicMaterial).color.setHex(isTurn ? 0x38bdf8 : 0x0284c7);

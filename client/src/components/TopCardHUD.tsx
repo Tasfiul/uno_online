@@ -232,8 +232,9 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
           </div>
 
           {lastActionMessage && (
-            <div className="mt-1 max-w-[280px] sm:max-w-md px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[9px] sm:text-[10px] text-slate-300 text-center truncate shadow">
-              {lastActionMessage}
+            <div className="mt-2.5 max-w-[92vw] sm:max-w-lg px-4 py-1.5 sm:px-5 sm:py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-cyan-400/50 text-white text-xs sm:text-sm font-bold text-center shadow-[0_4px_25px_rgba(0,0,0,0.8),0_0_15px_rgba(6,182,212,0.35)] flex items-center justify-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_8px_#22d3ee]" />
+              <span className="tracking-wide">{lastActionMessage}</span>
             </div>
           )}
         </div>
