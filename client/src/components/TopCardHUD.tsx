@@ -108,50 +108,65 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
       {/* Top Header Section: Clean 2-tier responsive navigation (zero collisions) */}
       <header className="flex flex-col gap-1 sm:gap-1.5 w-full">
         {/* Tier 1: Action & Stats Navigation Bar */}
-        <div className="flex items-center justify-between gap-1 sm:gap-2 w-full flex-nowrap">
-          {/* Left: Top Card Physical Preview & Voice Chat */}
-          <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 shrink-0">
-            {/* Top Card Widget */}
-            <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-lg sm:rounded-2xl glass-panel shadow-lg border border-white/10">
-              <div
-                className={`w-7 h-10 sm:w-11 sm:h-16 rounded sm:rounded-lg flex items-center justify-center border sm:border-2 border-white shadow-md relative overflow-hidden shrink-0 ${
-                  cardColorInfo.bg
-                }`}
-              >
-                {/* Solid White Center Oval */}
-                <div className="w-[84%] h-[80%] rounded-[6px] sm:rounded-[10px] bg-white flex items-center justify-center shadow-inner transform -rotate-12 border border-slate-200">
-                  {renderCardContent(topCard)}
-                </div>
+        <div className="flex items-start justify-between gap-1 sm:gap-2 w-full flex-nowrap">
+          {/* Left Column: Top Card Widget & Voice Chat on top, Quit button cleanly below (Zero overlap on any screen) */}
+          <div className="pointer-events-auto flex flex-col items-start gap-1 sm:gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              {/* Top Card Widget */}
+              <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-lg sm:rounded-2xl glass-panel shadow-lg border border-white/10">
+                <div
+                  className={`w-7 h-10 sm:w-11 sm:h-16 rounded sm:rounded-lg flex items-center justify-center border sm:border-2 border-white shadow-md relative overflow-hidden shrink-0 ${
+                    cardColorInfo.bg
+                  }`}
+                >
+                  {/* Solid White Center Oval */}
+                  <div className="w-[84%] h-[80%] rounded-[6px] sm:rounded-[10px] bg-white flex items-center justify-center shadow-inner transform -rotate-12 border border-slate-200">
+                    {renderCardContent(topCard)}
+                  </div>
 
-                {/* Corner Symbols */}
-                <span className="absolute top-0.5 left-0.5 sm:left-1 text-[6px] sm:text-[8px] font-black text-white drop-shadow leading-none">
-                  {topCard.type === 'number' ? topCard.value : topCard.type === 'draw2' ? '+2' : topCard.type === 'wild4' ? '+4' : ''}
-                </span>
-                <span className="absolute bottom-0.5 right-0.5 sm:right-1 text-[6px] sm:text-[8px] font-black text-white drop-shadow leading-none transform rotate-180">
-                  {topCard.type === 'number' ? topCard.value : topCard.type === 'draw2' ? '+2' : topCard.type === 'wild4' ? '+4' : ''}
-                </span>
-              </div>
-
-              {/* Active Color & Direction */}
-              <div className="flex flex-col justify-center pr-0.5 sm:pr-1">
-                <div className="flex items-center gap-1">
-                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${activeColorInfo.bg} shadow ring-1 ring-white/60 shrink-0`} />
-                  <span className={`text-[9px] sm:text-xs font-black tracking-wide ${activeColorInfo.text}`}>
-                    {activeColorInfo.label}
+                  {/* Corner Symbols */}
+                  <span className="absolute top-0.5 left-0.5 sm:left-1 text-[6px] sm:text-[8px] font-black text-white drop-shadow leading-none">
+                    {topCard.type === 'number' ? topCard.value : topCard.type === 'draw2' ? '+2' : topCard.type === 'wild4' ? '+4' : ''}
+                  </span>
+                  <span className="absolute bottom-0.5 right-0.5 sm:right-1 text-[6px] sm:text-[8px] font-black text-white drop-shadow leading-none transform rotate-180">
+                    {topCard.type === 'number' ? topCard.value : topCard.type === 'draw2' ? '+2' : topCard.type === 'wild4' ? '+4' : ''}
                   </span>
                 </div>
-                <span className="text-[8px] sm:text-[10px] text-slate-300 font-semibold mt-0.5">
-                  {direction === 1 ? '↻ CW' : '↺ CCW'}
-                </span>
+
+                {/* Active Color & Direction */}
+                <div className="flex flex-col justify-center pr-0.5 sm:pr-1">
+                  <div className="flex items-center gap-1">
+                    <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${activeColorInfo.bg} shadow ring-1 ring-white/60 shrink-0`} />
+                    <span className={`text-[9px] sm:text-xs font-black tracking-wide ${activeColorInfo.text}`}>
+                      {activeColorInfo.label}
+                    </span>
+                  </div>
+                  <span className="text-[8px] sm:text-[10px] text-slate-300 font-semibold mt-0.5">
+                    {direction === 1 ? '↻ CW' : '↺ CCW'}
+                  </span>
+                </div>
               </div>
+
+              {/* Voice Chat Button */}
+              <VoiceChatBar roomId={roomId} className="flex items-center" />
             </div>
 
-            {/* Voice Chat Button */}
-            <VoiceChatBar roomId={roomId} className="flex items-center" />
+            {/* Quit Button: Sits naturally in document flow directly beneath Top Card with guaranteed spacing */}
+            <button
+              onClick={() => {
+                sounds.playClick();
+                setShowQuitModal(true);
+              }}
+              title="Quit Match and return to Lobby"
+              className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 hover:border-red-400 text-red-300 hover:text-red-200 font-bold text-[10px] sm:text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span>Quit</span>
+            </button>
           </div>
 
           {/* Right: Action Controls (CHECK, CALL UNO, CHAT) */}
-          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 justify-end shrink-0">
+          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 justify-end shrink-0 pt-0.5 sm:pt-1">
             {/* CALL CHECK Button */}
             <button
               onClick={() => {
@@ -192,21 +207,6 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
               )}
             </button>
           </div>
-        </div>
-
-        {/* Repositioned Quit Button: Free space directly beneath top-left card widget (Zero collisions, spacious & easy to press) */}
-        <div className="pointer-events-auto fixed top-[56px] sm:top-[80px] left-1 sm:left-3 z-30">
-          <button
-            onClick={() => {
-              sounds.playClick();
-              setShowQuitModal(true);
-            }}
-            title="Quit Match and return to Lobby"
-            className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 hover:border-red-400 text-red-300 hover:text-red-200 font-bold text-[10px] sm:text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
-          >
-            <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
-            <span>Quit</span>
-          </button>
         </div>
 
         {/* Tier 2: Centered Turn Alert Banner & Action Message */}
