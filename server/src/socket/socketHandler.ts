@@ -19,8 +19,8 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       disconnectTimers.delete(userId);
     }
   }
-  // Active room head-tracking look directions: roomId -> Map<playerId, { yaw: number, pitch: number }>
-  const roomPlayerLooks = new Map<string, Map<string, { yaw: number; pitch: number }>>();
+  // Active room head-tracking look directions: roomId -> Map<playerId, { yaw: number, pitch: number, userId?: string }>
+  const roomPlayerLooks = new Map<string, Map<string, { yaw: number; pitch: number; userId?: string }>>();
   // Active room WebRTC voice chat members: roomId -> Set<socket.id>
   const roomVoicePeers = new Map<string, Set<string>>();
 
@@ -81,6 +81,15 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
 
         socket.emit('room:reconnected', { roomId, room: result.room });
         broadcastRoomUpdate(roomId);
+
+        // Sync look angles in roomPlayerLooks on reconnect
+        const roomLooks = roomPlayerLooks.get(roomId);
+        if (roomLooks && user.id) {
+          const prevLook = roomLooks.get(user.id);
+          if (prevLook) {
+            roomLooks.set(socket.id, prevLook);
+          }
+        }
 
         if (result.engine) {
           if (result.engine.state.status === 'playing') {
@@ -479,19 +488,26 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     });
 
     // 14. Realtime First-Person Head Movement / Look Tracking
-    socket.on('player:look', (payload: { yaw: number; pitch: number }) => {
+    socket.on('player:look', (payload: { yaw: number; pitch: number; userId?: string }) => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId || typeof payload?.yaw !== 'number' || typeof payload?.pitch !== 'number') return;
+
+      const player = socketPlayerMap.get(socket.id);
+      const userId = player?.userId || payload?.userId;
 
       let roomLooks = roomPlayerLooks.get(roomId);
       if (!roomLooks) {
         roomLooks = new Map();
         roomPlayerLooks.set(roomId, roomLooks);
       }
-      roomLooks.set(socket.id, { yaw: payload.yaw, pitch: payload.pitch });
+      roomLooks.set(socket.id, { yaw: payload.yaw, pitch: payload.pitch, userId });
+      if (userId) {
+        roomLooks.set(userId, { yaw: payload.yaw, pitch: payload.pitch, userId });
+      }
 
       socket.to(roomId).emit('player:looked', {
         playerId: socket.id,
+        userId: userId,
         yaw: payload.yaw,
         pitch: payload.pitch,
       });
@@ -502,7 +518,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       if (!roomId) return;
       const roomLooks = roomPlayerLooks.get(roomId);
       if (roomLooks && roomLooks.size > 0) {
-        const obj: Record<string, { yaw: number; pitch: number }> = {};
+        const obj: Record<string, { yaw: number; pitch: number; userId?: string }> = {};
         roomLooks.forEach((val, key) => {
           obj[key] = val;
         });
@@ -622,6 +638,12 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         if (voicePeers.size === 0) roomVoicePeers.delete(roomId);
       }
       sock.to(roomId).emit('voice:peer_left', { playerId: sock.id, peerId: sock.id });
+
+      const roomLooks = roomPlayerLooks.get(roomId);
+      if (roomLooks) {
+        roomLooks.delete(sock.id);
+        if (player?.userId) roomLooks.delete(player.userId);
+      }
 
       const quitRes = roomManager.quitRoom(roomId, player?.userId || sock.id);
       sock.emit('room:left');

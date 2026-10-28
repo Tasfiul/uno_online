@@ -723,7 +723,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
   const activeRigsMap = useRef<Map<string, HumanoidModelRig>>(new Map());
   const cardBackMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
 
-  // Opponents look tracking map: playerId -> { headGroup, bodyGroup, targetYaw, targetPitch, currentYaw, currentPitch }
+  // Opponents look tracking map: userKey -> { headGroup, bodyGroup, targetYaw, targetPitch, currentYaw, currentPitch }
   const opponentsLookMap = useRef<
     Map<
       string,
@@ -737,6 +737,14 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       }
     >
   >(new Map());
+
+  // Bidirectional alias mapping: socket.id or userId -> primary userKey
+  const socketIdToUserKey = useRef<Map<string, string>>(new Map());
+
+  const resolveUserKey = (keyOrSocketId?: string): string => {
+    if (!keyOrSocketId) return '';
+    return socketIdToUserKey.current.get(keyOrSocketId) || keyOrSocketId;
+  };
 
   // First-Person Seated Look-Around State
   const isDragging = useRef(false);
@@ -767,7 +775,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     emitLook(DEFAULT_YAW, DEFAULT_PITCH, true);
   };
 
-  // Helper to emit look angles to server
+  // Helper to emit look angles to server (anchored to user identity)
   const emitLook = (yaw: number, pitch: number, force = false) => {
     const now = performance.now();
     if (force || now - lastEmittedLook.current.time > 45) {
@@ -775,23 +783,34 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       const dp = Math.abs(pitch - lastEmittedLook.current.pitch);
       if (force || dy > 0.01 || dp > 0.01) {
         lastEmittedLook.current = { yaw, pitch, time: now };
-        socket.emit('player:look', { yaw, pitch });
+        socket.emit('player:look', { yaw, pitch, userId: myUserId });
       }
     }
   };
 
   // Sync other players' look-around head movements
   useEffect(() => {
-    const onPlayerLooked = (payload: { playerId: string; yaw: number; pitch: number }) => {
-      if (!payload?.playerId) return;
+    const onPlayerLooked = (payload: { playerId: string; userId?: string; yaw: number; pitch: number }) => {
+      if (!payload?.playerId && !payload?.userId) return;
 
-      // Update or store in persistent look angles
-      const existing = persistentLookAngles.current.get(payload.playerId);
+      // Ignore our own look-around broadcast
+      if (
+        (myPlayerId && payload.playerId === myPlayerId) ||
+        (myUserId && (payload.userId === myUserId || payload.playerId === myUserId))
+      ) {
+        return;
+      }
+
+      const userKey = resolveUserKey(payload.userId) || resolveUserKey(payload.playerId);
+      if (!userKey) return;
+
+      // Update persistent look angle
+      const existing = persistentLookAngles.current.get(userKey);
       if (existing) {
         existing.targetYaw = payload.yaw;
         existing.targetPitch = payload.pitch;
       } else {
-        persistentLookAngles.current.set(payload.playerId, {
+        persistentLookAngles.current.set(userKey, {
           targetYaw: payload.yaw,
           targetPitch: payload.pitch,
           currentYaw: payload.yaw,
@@ -799,30 +818,40 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         });
       }
 
-      const tracker = opponentsLookMap.current.get(payload.playerId);
+      const tracker = opponentsLookMap.current.get(userKey);
       if (tracker) {
         tracker.targetYaw = payload.yaw;
         tracker.targetPitch = payload.pitch;
       }
     };
 
-    const onPlayerAllLooks = (looks: Record<string, { yaw: number; pitch: number }>) => {
+    const onPlayerAllLooks = (looks: Record<string, { yaw: number; pitch: number; userId?: string }>) => {
       if (!looks) return;
-      Object.entries(looks).forEach(([playerId, look]) => {
-        if (playerId === myPlayerId) return;
-        const existing = persistentLookAngles.current.get(playerId);
+      Object.entries(looks).forEach(([key, look]) => {
+        const userId = look.userId || key;
+        if (
+          (myPlayerId && (key === myPlayerId || userId === myPlayerId)) ||
+          (myUserId && (key === myUserId || userId === myUserId))
+        ) {
+          return;
+        }
+
+        const userKey = resolveUserKey(userId) || resolveUserKey(key);
+        if (!userKey) return;
+
+        const existing = persistentLookAngles.current.get(userKey);
         if (existing) {
           existing.targetYaw = look.yaw;
           existing.targetPitch = look.pitch;
         } else {
-          persistentLookAngles.current.set(playerId, {
+          persistentLookAngles.current.set(userKey, {
             targetYaw: look.yaw,
             targetPitch: look.pitch,
             currentYaw: look.yaw,
             currentPitch: look.pitch,
           });
         }
-        const tracker = opponentsLookMap.current.get(playerId);
+        const tracker = opponentsLookMap.current.get(userKey);
         if (tracker) {
           tracker.targetYaw = look.yaw;
           tracker.targetPitch = look.pitch;
@@ -838,7 +867,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       socket.off('player:looked', onPlayerLooked);
       socket.off('player:all_looks', onPlayerAllLooks);
     };
-  }, [myPlayerId]);
+  }, [myPlayerId, myUserId]);
 
   // Initialize Scene
   useEffect(() => {
@@ -1267,7 +1296,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     }
 
     const radius = 5.85; // Table edge distance (comfortably seated outside table rim without clipping)
-    const currentActiveIds = new Set<string>();
+    const currentActiveKeys = new Set<string>();
     const isMobile = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
 
     sortedPlayers.forEach((player, i) => {
@@ -1275,26 +1304,38 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       const isMe = (myPlayerId && player.id === myPlayerId) || (myUserId && player.userId === myUserId);
       if (isMe) return;
 
-      currentActiveIds.add(player.id);
+      const userKey = player.userId || player.id;
+      currentActiveKeys.add(userKey);
+      currentActiveKeys.add(player.id);
+      if (player.userId) currentActiveKeys.add(player.userId);
+
+      // Register active alias mapping
+      socketIdToUserKey.current.set(player.id, userKey);
+      if (player.userId) {
+        socketIdToUserKey.current.set(player.userId, userKey);
+      }
+
       const isTurn = player.id === gameState.currentTurnPlayerId;
       const angle = (i / numPlayers) * Math.PI * 2 + Math.PI / 2;
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
 
-      // Look up existing rig by player.id or player.userId (preserves rig across socket reconnects)
-      let existingRig = activeRigsMap.current.get(player.id);
+      // Look up existing rig by userKey or player.id
+      let existingRig = activeRigsMap.current.get(userKey) || activeRigsMap.current.get(player.id);
       if (!existingRig && player.userId) {
         for (const [id, r] of activeRigsMap.current.entries()) {
           if (r.player.userId === player.userId) {
             existingRig = r;
-            activeRigsMap.current.delete(id);
-            activeRigsMap.current.set(player.id, existingRig);
             break;
           }
         }
       }
 
       if (existingRig) {
+        // Update stored reference to active socket ID & player state
+        existingRig.player = player;
+        activeRigsMap.current.set(userKey, existingRig);
+
         // Guarantee the rig's 3D group is attached to the active scene's playersGroup!
         if (!playersGroup.children.includes(existingRig.group)) {
           playersGroup.add(existingRig.group);
@@ -1317,8 +1358,35 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
           existingRig.halo.visible = isTurn;
           (existingRig.leftRing.material as THREE.MeshBasicMaterial).color.setHex(isTurn ? 0x38bdf8 : 0x0284c7);
           (existingRig.rightRing.material as THREE.MeshBasicMaterial).color.setHex(isTurn ? 0x38bdf8 : 0x0284c7);
+          if (existingRig.sprite.material.map) {
+            existingRig.sprite.material.map.dispose();
+          }
           existingRig.sprite.material.map = createBadgeTexture(player, isTurn);
           existingRig.sprite.material.needsUpdate = true;
+        }
+
+        // Ensure tracker in opponentsLookMap is active and bound to this rig's head & body groups
+        let tracker = opponentsLookMap.current.get(userKey);
+        if (!tracker) {
+          const savedLook = persistentLookAngles.current.get(userKey) || {
+            targetYaw: 0,
+            targetPitch: 0,
+            currentYaw: 0,
+            currentPitch: 0,
+          };
+          tracker = {
+            headGroup: existingRig.headGroup,
+            bodyGroup: existingRig.bodyGroup,
+            targetYaw: savedLook.targetYaw,
+            targetPitch: savedLook.targetPitch,
+            currentYaw: savedLook.currentYaw,
+            currentPitch: savedLook.currentPitch,
+          };
+          opponentsLookMap.current.set(userKey, tracker);
+        } else {
+          // Re-bind headGroup and bodyGroup in case rig was reconstructed
+          tracker.headGroup = existingRig.headGroup;
+          tracker.bodyGroup = existingRig.bodyGroup;
         }
       } else {
         // New player rig: construct model
@@ -1328,8 +1396,8 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         rig.group.rotateY(Math.PI);
 
         // Recover any known persistent look angle so the avatar never spawns facing dead-center if already looking away
-        const savedLook = persistentLookAngles.current.get(player.id) ||
-          (player.userId ? persistentLookAngles.current.get(player.userId) : undefined) || {
+        const savedLook = persistentLookAngles.current.get(userKey) ||
+          persistentLookAngles.current.get(player.id) || {
             targetYaw: 0,
             targetPitch: 0,
             currentYaw: 0,
@@ -1342,9 +1410,9 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         rig.bodyGroup.rotation.y = -savedLook.currentYaw * 0.35;
 
         playersGroup.add(rig.group);
-        activeRigsMap.current.set(player.id, rig);
+        activeRigsMap.current.set(userKey, rig);
 
-        opponentsLookMap.current.set(player.id, {
+        opponentsLookMap.current.set(userKey, {
           headGroup: rig.headGroup,
           bodyGroup: rig.bodyGroup,
           targetYaw: savedLook.targetYaw,
@@ -1356,11 +1424,19 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     });
 
     // Remove any disconnected players who left the room
-    activeRigsMap.current.forEach((rig, playerId) => {
-      if (!currentActiveIds.has(playerId)) {
+    activeRigsMap.current.forEach((rig, key) => {
+      const isStillActive = currentActiveKeys.has(key) ||
+        currentActiveKeys.has(rig.player.id) ||
+        (rig.player.userId && currentActiveKeys.has(rig.player.userId));
+      if (!isStillActive) {
         playersGroup.remove(rig.group);
-        activeRigsMap.current.delete(playerId);
-        opponentsLookMap.current.delete(playerId);
+        activeRigsMap.current.delete(key);
+        opponentsLookMap.current.delete(key);
+        if (rig.player.userId) {
+          opponentsLookMap.current.delete(rig.player.userId);
+          socketIdToUserKey.current.delete(rig.player.userId);
+        }
+        socketIdToUserKey.current.delete(rig.player.id);
       }
     });
   }, [gameState.players, gameState.currentTurnPlayerId, myPlayerId, myUserId, sceneReady]);
