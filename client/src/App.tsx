@@ -290,8 +290,6 @@ export const App: React.FC = () => {
             onPassTurn={handlePassTurn}
             onCallUno={handleCallUno}
             onCallCheck={handleCallCheck}
-            myCardCount={myPlayer?.cards?.length ?? myPlayer?.cardCount ?? 0}
-            hasSaidUno={myPlayer?.hasSaidUno || false}
             handVisible={handVisible}
             onToggleHand={() => setHandVisible(!handVisible)}
             direction={gameState.direction}

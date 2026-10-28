@@ -14,8 +14,6 @@ interface TopCardHUDProps {
   onPassTurn?: () => void;
   onCallUno: () => void;
   onCallCheck: () => void;
-  myCardCount?: number;
-  hasSaidUno?: boolean;
   handVisible: boolean;
   onToggleHand: () => void;
   direction: 1 | -1;
@@ -45,8 +43,6 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
   onPassTurn,
   onCallUno,
   onCallCheck,
-  myCardCount = 0,
-  hasSaidUno = false,
   handVisible,
   onToggleHand,
   direction,
@@ -174,22 +170,10 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 sounds.playUno();
                 onCallUno();
               }}
-              title={
-                hasSaidUno
-                  ? 'UNO is registered for this turn'
-                  : isMyTurn && myCardCount === 2
-                  ? 'Call UNO now before playing your card!'
-                  : 'Call UNO on your turn when you have 2 cards left'
-              }
-              className={`px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap border ${
-                hasSaidUno
-                  ? 'bg-emerald-600/30 border-emerald-400 text-emerald-300'
-                  : isMyTurn && myCardCount === 2
-                  ? 'bg-amber-500 hover:bg-amber-400 border-amber-300 text-black animate-pulse font-black'
-                  : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-amber-200'
-              }`}
+              title="Call UNO"
+              className="px-2 py-1 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-amber-200 font-black text-[10px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
             >
-              <span>{hasSaidUno ? '✓ UNO CALLED' : isMyTurn && myCardCount === 2 ? '⚡ CALL UNO!' : 'CALL UNO'}</span>
+              <span>CALL UNO</span>
             </button>
 
             {/* LIVE CHAT Button */}
