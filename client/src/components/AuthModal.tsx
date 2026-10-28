@@ -221,7 +221,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
             <div className="pt-1">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
                   Optional Profile Picture
                 </label>
                 <label className="cursor-pointer text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">

@@ -58,7 +58,6 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
           <h2 className="text-3xl font-black italic tracking-tight text-white mb-1 flex items-center justify-center gap-2">
             <span>WINNER!</span>
-            <Sparkles className="w-6 h-6 text-yellow-400" />
           </h2>
 
           <p className="text-xs text-slate-400 mb-6">Game finished! Champion crowned.</p>
