@@ -9,8 +9,16 @@ interface UnoScene3DProps {
   myUserId?: string;
 }
 
-// Procedural Card Canvas Texture Generator
+// Texture Caches to prevent GPU memory bloat & re-drawing on every frame
+const cardTextureCache = new Map<string, THREE.CanvasTexture>();
+const avatarTextureCache = new Map<string, THREE.CanvasTexture>();
+
+// Procedural Card Canvas Texture Generator (Cached)
 function createCardTexture(card: UnoCard | null, isBack: boolean = false): THREE.CanvasTexture {
+  const cacheKey = isBack || !card ? 'back' : `${card.color}_${card.type}_${card.value}`;
+  const cached = cardTextureCache.get(cacheKey);
+  if (cached) return cached;
+
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 384;
@@ -101,12 +109,18 @@ function createCardTexture(card: UnoCard | null, isBack: boolean = false): THREE
   }
 
   const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  cardTextureCache.set(cacheKey, texture);
   return texture;
 }
 
-// Procedural Humanoid Avatar Face Texture Generator
+// Procedural Humanoid Avatar Face Texture Generator (Cached)
 function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): THREE.CanvasTexture {
+  const cacheKey = avatarUrl || username;
+  const cached = avatarTextureCache.get(cacheKey);
+  if (cached) return cached;
+
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
@@ -202,6 +216,7 @@ function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): T
   img.src = effectiveUrl;
 
   texture.needsUpdate = true;
+  avatarTextureCache.set(cacheKey, texture);
   return texture;
 }
 
@@ -270,13 +285,15 @@ interface HumanoidModelRig {
   player: Player;
 }
 
+// Reusable immutable geometry for held cards (prevents allocation spikes)
+const sharedHeldCardGeo = new THREE.PlaneGeometry(0.72, 1.08);
+
 // Rebuild or update the fan of cards held in hands
-function rebuildCardFan(fanGroup: THREE.Group, cardCount: number, cardBackMat: THREE.Material) {
+function rebuildCardFan(fanGroup: THREE.Group, cardCount: number, cardBackMat: THREE.Material, isMobile: boolean = false) {
   while (fanGroup.children.length > 0) {
     fanGroup.remove(fanGroup.children[0]);
   }
   const cardsInHand = Math.min(cardCount, 8);
-  const heldCardGeo = new THREE.PlaneGeometry(0.72, 1.08);
 
   for (let c = 0; c < cardsInHand; c++) {
     const cardHolder = new THREE.Group();
@@ -289,10 +306,12 @@ function rebuildCardFan(fanGroup: THREE.Group, cardCount: number, cardBackMat: T
     // Fanning arc around Z axis
     cardHolder.rotation.z = fanRotZ;
 
-    const cardMesh = new THREE.Mesh(heldCardGeo, cardBackMat);
+    const cardMesh = new THREE.Mesh(sharedHeldCardGeo, cardBackMat);
     // Face the viewer (-Z) upright with no horizontal or vertical mirroring
     cardMesh.rotation.y = Math.PI;
-    cardMesh.castShadow = true;
+    if (!isMobile) {
+      cardMesh.castShadow = true;
+    }
     cardHolder.add(cardMesh);
 
     fanGroup.add(cardHolder);
@@ -304,7 +323,8 @@ function createHumanoidPlayerModel(
   player: Player,
   isTurn: boolean,
   colorIndex: number,
-  cardBackMat: THREE.Material
+  cardBackMat: THREE.Material,
+  isMobile: boolean = false
 ): HumanoidModelRig {
   const group = new THREE.Group();
 
@@ -323,7 +343,7 @@ function createHumanoidPlayerModel(
   });
   const seat = new THREE.Mesh(seatGeo, seatMat);
   seat.position.y = 0.11;
-  seat.castShadow = true;
+  if (!isMobile) seat.castShadow = true;
   seat.receiveShadow = true;
   chairGroup.add(seat);
 
@@ -348,7 +368,7 @@ function createHumanoidPlayerModel(
   });
   const headrest = new THREE.Mesh(headrestGeo, headrestMat);
   headrest.position.set(0, 1.98, 0.72);
-  headrest.castShadow = true;
+  if (!isMobile) headrest.castShadow = true;
   chairGroup.add(headrest);
 
   // Metallic Armrests
@@ -375,37 +395,37 @@ function createHumanoidPlayerModel(
   });
 
   // Torso / Jacket
-  const torsoGeo = new THREE.CylinderGeometry(0.46, 0.58, 1.05, 24);
+  const torsoGeo = new THREE.CylinderGeometry(0.46, 0.58, 1.05, isMobile ? 16 : 24);
   const torso = new THREE.Mesh(torsoGeo, clothMat);
   torso.position.y = 0.75;
   torso.castShadow = true;
   bodyGroup.add(torso);
 
   // Shoulders (rounded bar)
-  const shouldersGeo = new THREE.CylinderGeometry(0.24, 0.24, 1.15, 16);
+  const shouldersGeo = new THREE.CylinderGeometry(0.24, 0.24, 1.15, 14);
   shouldersGeo.rotateZ(Math.PI / 2);
   const shoulders = new THREE.Mesh(shouldersGeo, clothMat);
   shoulders.position.set(0, 1.25, 0.02);
-  shoulders.castShadow = true;
+  if (!isMobile) shoulders.castShadow = true;
   bodyGroup.add(shoulders);
 
   // Arms extending forward towards table
-  const armGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.68, 16);
+  const armGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.68, 14);
   armGeo.rotateX(-Math.PI / 3.8); // angled forward towards table edge
 
   const leftArm = new THREE.Mesh(armGeo, clothMat);
   leftArm.position.set(-0.52, 0.95, -0.22);
-  leftArm.castShadow = true;
+  if (!isMobile) leftArm.castShadow = true;
   bodyGroup.add(leftArm);
 
   const rightArm = new THREE.Mesh(armGeo, clothMat);
   rightArm.position.set(0.52, 0.95, -0.22);
-  rightArm.castShadow = true;
+  if (!isMobile) rightArm.castShadow = true;
   bodyGroup.add(rightArm);
 
   // Hands (skin tone) holding the cards
   const skinMat = new THREE.MeshStandardMaterial({ color: 0xf5d0b0, roughness: 0.5 });
-  const handGeo = new THREE.SphereGeometry(0.12, 16, 16);
+  const handGeo = new THREE.SphereGeometry(0.12, 12, 12);
   const leftHand = new THREE.Mesh(handGeo, skinMat);
   leftHand.position.set(-0.24, 0.64, -0.56);
   bodyGroup.add(leftHand);
@@ -417,7 +437,7 @@ function createHumanoidPlayerModel(
   // 3D Fan of Cards held in hands (Upright, tilted naturally back towards player's chest)
   const fanGroup = new THREE.Group();
   fanGroup.position.set(0, 0.66, -0.55); // centered at player's hands
-  rebuildCardFan(fanGroup, player.cardCount, cardBackMat);
+  rebuildCardFan(fanGroup, player.cardCount, cardBackMat, isMobile);
   bodyGroup.add(fanGroup);
 
   group.add(bodyGroup);
@@ -730,12 +750,24 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     cameraRef.current = camera;
     updateCameraLook();
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    const isMobile = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !isMobile,
+      alpha: false,
+      powerPreference: 'high-performance',
+      precision: isMobile ? 'mediump' : 'highp',
+      stencil: false,
+      depth: true,
+    });
     rendererRef.current = renderer;
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Limit DPR on mobile to 1.25 (or 1.5 max on wide tablets), 1.75 on desktop
+    const maxDpr = isMobile ? (window.innerWidth < 500 ? 1.25 : 1.5) : 1.75;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
     // ==========================================
@@ -747,15 +779,19 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     const dirLight = new THREE.DirectionalLight(0xfff5ea, 1.1);
     dirLight.position.set(4, 10, 6);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.mapSize.width = isMobile ? 512 : 1024;
+    dirLight.shadow.mapSize.height = isMobile ? 512 : 1024;
     scene.add(dirLight);
 
     // Overhead Pendant Hanging Lamp with Spotlight
     const pendantLight = new THREE.SpotLight(0xfffaed, 2.5, 14, Math.PI / 3.2, 0.45, 1.2);
     pendantLight.position.set(0, 5.5, 0);
     pendantLight.target.position.set(0, 0, 0);
-    pendantLight.castShadow = true;
+    pendantLight.castShadow = !isMobile;
+    if (!isMobile) {
+      pendantLight.shadow.mapSize.width = 512;
+      pendantLight.shadow.mapSize.height = 512;
+    }
     scene.add(pendantLight);
     scene.add(pendantLight.target);
 
@@ -874,8 +910,9 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       const cardMesh = new THREE.Mesh(cardGeo, cardBackMat);
       cardMesh.position.set((Math.random() - 0.5) * 0.02, i * 0.025, (Math.random() - 0.5) * 0.02);
       cardMesh.rotation.y = (Math.random() - 0.5) * 0.08;
-      cardMesh.castShadow = true;
-      cardMesh.receiveShadow = true;
+      // Only the top card of the draw pile casts/receives shadow
+      cardMesh.castShadow = (i === 11);
+      cardMesh.receiveShadow = (i === 11);
       drawPileGroup.add(cardMesh);
     }
     scene.add(drawPileGroup);
@@ -908,6 +945,9 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(w, h);
+      const isMob = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
+      const maxD = isMob ? (window.innerWidth < 500 ? 1.25 : 1.5) : 1.75;
+      rendererRef.current.setPixelRatio(Math.min(window.devicePixelRatio, maxD));
     };
     window.addEventListener('resize', handleResize);
 
@@ -979,10 +1019,18 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
 
     // Animation Loop
     let animId: number;
+    let lastRenderTime = 0;
     const clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
+
+      // Background tab throttling to save battery and GPU cycles
+      const now = performance.now();
+      if (document.hidden && now - lastRenderTime < 100) {
+        return;
+      }
+      lastRenderTime = now;
 
       // Smooth local head turn interpolation (lerp damping)
       currentYaw.current += (targetYaw.current - currentYaw.current) * 0.14;
@@ -1114,6 +1162,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
 
     const radius = 5.3; // Table edge distance
     const currentActiveIds = new Set<string>();
+    const isMobile = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
 
     sortedPlayers.forEach((player, i) => {
       // In First-Person POV, your own avatar (index 0) is NOT rendered in front of your own eyes
@@ -1152,7 +1201,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
 
         // Update card fan if card count changed
         if (existingRig.cardCount !== player.cardCount) {
-          rebuildCardFan(existingRig.fanGroup, player.cardCount, cardBackMat);
+          rebuildCardFan(existingRig.fanGroup, player.cardCount, cardBackMat, isMobile);
           existingRig.cardCount = player.cardCount;
         }
 
@@ -1167,7 +1216,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         }
       } else {
         // New player rig: construct model
-        const rig = createHumanoidPlayerModel(player, isTurn, i, cardBackMat);
+        const rig = createHumanoidPlayerModel(player, isTurn, i, cardBackMat, isMobile);
         rig.group.position.set(x, 0.0, z);
         rig.group.lookAt(0, 0.0, 0);
         rig.group.rotateY(Math.PI);
