@@ -116,7 +116,7 @@ function createCardTexture(card: UnoCard | null, isBack: boolean = false): THREE
   return texture;
 }
 
-// Procedural Cute Big Expressive Eyes Face Texture (512x512 Canvas with transparent background)
+// Procedural Goofy & Neutral Cartoon Eyes Face Texture (512x512 Canvas with transparent background)
 function getCuteFaceTexture(): THREE.CanvasTexture {
   if (cuteFaceTexture) return cuteFaceTexture;
 
@@ -127,95 +127,45 @@ function getCuteFaceTexture(): THREE.CanvasTexture {
 
   ctx.clearRect(0, 0, 512, 512);
 
-  // Helper for drawing one big anime/chibi eye
+  // Helper for drawing one big goofy cartoon eye (neutral, bold, derpy)
   function drawEye(cx: number, cy: number, isLeft: boolean) {
     ctx.save();
 
-    // 1. Eye base / Iris (Big expressive vertical oval)
+    // 1. Sclera: Big bold cartoon eye (solid white with thick dark outline)
     const rx = 46;
-    const ry = 66;
-
-    // Sclera / subtle crisp white backing so eye pops against skin
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, rx + 1.5, ry + 1.5, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-
-    // Dark rich iris gradient (deep obsidian -> rich midnight blue/indigo)
-    const irisGrad = ctx.createLinearGradient(cx, cy - ry, cx, cy + ry);
-    irisGrad.addColorStop(0, '#090d16');
-    irisGrad.addColorStop(0.45, '#1e1b4b');
-    irisGrad.addColorStop(0.85, '#312e81');
-    irisGrad.addColorStop(1, '#4338ca');
+    const ry = 56;
 
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fillStyle = irisGrad;
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#0f172a';
+    ctx.stroke();
+
+    // 2. Pupil: Bold dark circular pupil (slightly derpy/inward gaze for goofy charm)
+    const pupilOffsetX = isLeft ? 6 : -6;
+    const pupilOffsetY = 2;
+    const px = cx + pupilOffsetX;
+    const py = cy + pupilOffsetY;
+    const prx = 22;
+    const pry = 26;
+
+    ctx.beginPath();
+    ctx.ellipse(px, py, prx, pry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
     ctx.fill();
 
-    // Lower iris colorful crescent glow (gives animated alive look)
-    ctx.save();
+    // 3. Crisp cartoon reflection shine (clean, neutral, no eyelashes, no makeup)
     ctx.beginPath();
-    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.clip();
-
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + ry * 0.42, rx * 0.8, ry * 0.44, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.6)'; // Electric cyan glow
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + ry * 0.54, rx * 0.52, ry * 0.28, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.fill();
-    ctx.restore();
-
-    // 2. Sparkle glints (Iconic big chibi sparkles!)
-    // Main large sparkle (upper corner)
-    const glint1X = isLeft ? cx - 15 : cx - 12;
-    const glint1Y = cy - 20;
-    ctx.beginPath();
-    ctx.ellipse(glint1X, glint1Y, 17, 21, -0.2, 0, Math.PI * 2);
+    ctx.arc(px - 7, py - 8, 8, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
 
-    // Secondary sparkle (lower opposite corner)
-    const glint2X = isLeft ? cx + 18 : cx + 20;
-    const glint2Y = cy + 18;
     ctx.beginPath();
-    ctx.arc(glint2X, glint2Y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.arc(px + 8, py + 8, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fill();
-
-    // Small micro sparkle dot
-    const glint3X = isLeft ? cx - 13 : cx - 9;
-    const glint3Y = cy + 18;
-    ctx.beginPath();
-    ctx.arc(glint3X, glint3Y, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.fill();
-
-    // 3. Thick expressive upper lash line
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - ry * 0.86, rx * 1.08, ry * 0.32, isLeft ? -0.08 : 0.08, Math.PI * 0.95, Math.PI * 2.05);
-    ctx.lineWidth = 9;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#090d16';
-    ctx.stroke();
-
-    // Cute outer lash flick
-    ctx.beginPath();
-    ctx.moveTo(cx + (isLeft ? -rx * 0.88 : rx * 0.88), cy - ry * 0.7);
-    ctx.quadraticCurveTo(
-      cx + (isLeft ? -rx * 1.25 : rx * 1.25),
-      cy - ry * 0.95,
-      cx + (isLeft ? -rx * 1.35 : rx * 1.35),
-      cy - ry * 1.15
-    );
-    ctx.lineWidth = 5.5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#090d16';
-    ctx.stroke();
 
     ctx.restore();
   }
@@ -224,64 +174,51 @@ function getCuteFaceTexture(): THREE.CanvasTexture {
   drawEye(172, 230, true);
   drawEye(340, 230, false);
 
-  // 4. Cheerful gentle eyebrows
+  // 4. Goofy expressive cartoon eyebrows (thick, friendly, slightly quizzical)
   function drawEyebrow(cx: number, cy: number, isLeft: boolean) {
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(cx - 36, cy + (isLeft ? 6 : -2));
-    ctx.quadraticCurveTo(cx, cy - 14, cx + 36, cy + (isLeft ? -2 : 6));
-    ctx.lineWidth = 6;
+    if (isLeft) {
+      // Slightly raised curious arch
+      ctx.moveTo(cx - 38, cy + 4);
+      ctx.quadraticCurveTo(cx - 5, cy - 22, cx + 38, cy - 6);
+    } else {
+      // Slightly relaxed / goofy arch
+      ctx.moveTo(cx - 38, cy - 6);
+      ctx.quadraticCurveTo(cx + 5, cy - 20, cx + 38, cy + 4);
+    }
+    ctx.lineWidth = 8;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#0f172a';
     ctx.stroke();
     ctx.restore();
   }
-  drawEyebrow(172, 138, true);
-  drawEyebrow(340, 138, false);
+  drawEyebrow(172, 142, true);
+  drawEyebrow(340, 142, false);
 
-  // 5. Cute rosy blush cheeks
-  function drawBlush(cx: number, cy: number) {
-    ctx.save();
-    const blushGrad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 42);
-    blushGrad.addColorStop(0, 'rgba(244, 63, 94, 0.45)');
-    blushGrad.addColorStop(0.6, 'rgba(251, 113, 133, 0.25)');
-    blushGrad.addColorStop(1, 'rgba(251, 113, 133, 0)');
-    ctx.fillStyle = blushGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 42, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cute anime blush marks (two little angled strokes)
-    ctx.strokeStyle = 'rgba(225, 29, 72, 0.55)';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx - 10, cy + 6);
-    ctx.lineTo(cx - 2, cy - 6);
-    ctx.moveTo(cx + 4, cy + 6);
-    ctx.lineTo(cx + 12, cy - 6);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-  drawBlush(115, 305);
-  drawBlush(397, 305);
-
-  // 6. Cute small smile
+  // 5. Goofy cheerful cartoon open grin (sitting comfortably above card hand)
   ctx.save();
   ctx.beginPath();
-  ctx.arc(256, 320, 26, 0.18 * Math.PI, 0.82 * Math.PI);
-  ctx.lineWidth = 5.5;
+  ctx.arc(256, 310, 26, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.closePath();
+  ctx.fillStyle = '#0f172a';
+  ctx.fill();
+  ctx.lineWidth = 5;
   ctx.lineCap = 'round';
-  ctx.strokeStyle = '#991b1b';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#0f172a';
   ctx.stroke();
 
-  // Subtle mouth corner accents
-  ctx.fillStyle = '#991b1b';
+  // Cute cartoon tongue peeking at the bottom
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(233, 332, 2.5, 0, Math.PI * 2);
-  ctx.arc(279, 332, 2.5, 0, Math.PI * 2);
+  ctx.arc(256, 310, 26, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.clip();
+  ctx.beginPath();
+  ctx.arc(256, 330, 16, 0, Math.PI * 2);
+  ctx.fillStyle = '#f43f5e';
   ctx.fill();
+  ctx.restore();
   ctx.restore();
 
   cuteFaceTexture = new THREE.CanvasTexture(canvas);
