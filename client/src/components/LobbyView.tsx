@@ -93,23 +93,22 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
     return (
       <div className="relative min-h-screen w-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-white">
-        
+
         {/* Glow ambient */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="glass-modal max-w-xl w-full p-6 sm:p-8 rounded-3xl border border-white/10 shadow-2xl relative z-10 animate-in fade-in zoom-in-95 duration-200">
-          
+
           {/* Room Header */}
           <div className="flex items-start justify-between border-b border-white/10 pb-5 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xl sm:text-2xl font-black text-white">{currentRoom.name}</span>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    currentRoom.isPublic
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentRoom.isPublic
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                       : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                  }`}
+                    }`}
                 >
                   {currentRoom.isPublic ? 'Public' : 'Private'}
                 </span>
@@ -183,11 +182,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   onStartGame();
                 }}
                 disabled={!canStart}
-                className={`w-full py-4 rounded-2xl font-black text-sm tracking-wide shadow-2xl transition-all transform active:scale-98 flex items-center justify-center gap-2 border ${
-                  canStart
+                className={`w-full py-4 rounded-2xl font-black text-sm tracking-wide shadow-2xl transition-all transform active:scale-98 flex items-center justify-center gap-2 border ${canStart
                     ? 'bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 hover:from-red-500 hover:to-yellow-400 text-white border-orange-400 shadow-orange-500/25 cursor-pointer'
                     : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed'
-                }`}
+                  }`}
               >
                 <Play className="w-5 h-5 fill-current" />
                 <span>{canStart ? 'START UNO MATCH' : 'WAITING FOR PLAYERS (MIN 2)'}</span>
@@ -207,7 +205,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   // Main Room Browser View
   return (
     <div className="relative min-h-screen w-full flex flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-indigo-950 text-white overflow-y-auto">
-      
+
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-30 w-full glass-panel border-b border-white/10 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         {/* Logo */}
@@ -257,14 +255,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        
+
         {/* Banner with Action Buttons */}
         <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/10 shadow-2xl relative overflow-hidden mb-8">
           <div className="relative z-10 max-w-xl">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold mb-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              Real-Time 3D Uno Game
-            </span>
             <h2 className="text-2xl sm:text-4xl font-black italic tracking-tight text-white mb-2">
               PLAY WITH FRIENDS & VOICE CHAT
             </h2>
@@ -418,11 +412,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsPublic(true)}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
-                      isPublic
+                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${isPublic
                         ? 'bg-blue-600 text-white border-blue-400 shadow'
                         : 'glass-panel text-slate-400 border-white/5 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <Globe className="w-3.5 h-3.5" />
                     Public Room
@@ -430,11 +423,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsPublic(false)}
-                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
-                      !isPublic
+                    className={`py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${!isPublic
                         ? 'bg-amber-600 text-white border-amber-400 shadow'
                         : 'glass-panel text-slate-400 border-white/5 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <Lock className="w-3.5 h-3.5" />
                     Private Room

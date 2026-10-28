@@ -218,7 +218,6 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
           >
             {isMyTurn ? (
               <>
-                <Sparkles className="w-3.5 h-3.5 text-black" />
                 <span className="text-xs sm:text-sm tracking-wide font-black">IT'S YOUR TURN!</span>
               </>
             ) : (
