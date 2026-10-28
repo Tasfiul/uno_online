@@ -9,6 +9,7 @@ import { TopCardHUD } from './components/TopCardHUD';
 import { PlayerHand } from './components/PlayerHand';
 import { ChatDrawer } from './components/ChatDrawer';
 import { VoiceChatBar } from './components/VoiceChatBar';
+import { voiceChat } from './services/webrtc';
 import { GameOverModal } from './components/GameOverModal';
 import { sounds } from './services/audio';
 
@@ -150,6 +151,7 @@ export const App: React.FC = () => {
   }
 
   const handleLogout = () => {
+    voiceChat.disableVoice();
     localStorage.removeItem('uno_active_room_id');
     api.clearToken();
     setCurrentUser(null);
@@ -183,6 +185,7 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveRoom = () => {
+    voiceChat.disableVoice();
     socket.emit('room:leave');
     localStorage.removeItem('uno_active_room_id');
     setCurrentRoom(null);
@@ -191,6 +194,7 @@ export const App: React.FC = () => {
   };
 
   const handleQuitMatch = () => {
+    voiceChat.disableVoice();
     socket.emit('room:quit');
     localStorage.removeItem('uno_active_room_id');
     setCurrentRoom(null);

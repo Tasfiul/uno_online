@@ -13,6 +13,8 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
   const DISCONNECT_GRACE_MS = 15000; // 15 seconds grace window
   // Active room head-tracking look directions: roomId -> Map<playerId, { yaw: number, pitch: number }>
   const roomPlayerLooks = new Map<string, Map<string, { yaw: number; pitch: number }>>();
+  // Active room WebRTC voice chat members: roomId -> Set<socket.id>
+  const roomVoicePeers = new Map<string, Set<string>>();
 
   function broadcastRoomUpdate(roomId: string) {
     const room = roomManager.getRoom(roomId);
@@ -392,7 +394,41 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     });
 
     // 13. Live WebRTC Voice Chat Signaling
+    socket.on('voice:join', () => {
+      const roomId = socketRoomMap.get(socket.id);
+      if (!roomId) return;
+
+      let peersSet = roomVoicePeers.get(roomId);
+      if (!peersSet) {
+        peersSet = new Set<string>();
+        roomVoicePeers.set(roomId, peersSet);
+      }
+
+      // Return current voice peers to this joining socket (excluding themselves)
+      const existingPeers = Array.from(peersSet).filter(id => id !== socket.id);
+      socket.emit('voice:peers', { peers: existingPeers });
+
+      // Add socket to set and inform others
+      peersSet.add(socket.id);
+      socket.to(roomId).emit('voice:peer_joined', { peerId: socket.id, playerId: socket.id });
+    });
+
+    socket.on('voice:leave', () => {
+      const roomId = socketRoomMap.get(socket.id);
+      if (!roomId) return;
+
+      const peersSet = roomVoicePeers.get(roomId);
+      if (peersSet) {
+        peersSet.delete(socket.id);
+        if (peersSet.size === 0) {
+          roomVoicePeers.delete(roomId);
+        }
+      }
+      socket.to(roomId).emit('voice:peer_left', { peerId: socket.id, playerId: socket.id });
+    });
+
     socket.on('voice:signal', (payload: VoiceSignalPayload) => {
+      if (!payload || !payload.target) return;
       io.to(payload.target).emit('voice:signal', {
         sender: socket.id,
         signal: payload.signal,
@@ -407,6 +443,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       }
       if (roomId) {
         io.to(roomId).emit('voice:mute_status', {
+          peerId: socket.id,
           playerId: socket.id,
           isMuted: payload.isMuted,
         });
@@ -417,6 +454,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       const roomId = socketRoomMap.get(socket.id);
       if (roomId) {
         socket.to(roomId).emit('voice:speaking_status', {
+          peerId: socket.id,
           playerId: socket.id,
           isSpeaking: payload.isSpeaking,
         });
@@ -474,8 +512,13 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       socketRoomMap.delete(socket.id);
       socketPlayerMap.delete(socket.id);
 
-      // Notify WebRTC peers to mute/pause audio for this socket
-      socket.to(roomId).emit('voice:peer_left', { playerId: socket.id });
+      // Notify WebRTC peers to mute/pause audio and remove from active voice
+      const voicePeers = roomVoicePeers.get(roomId);
+      if (voicePeers) {
+        voicePeers.delete(socket.id);
+        if (voicePeers.size === 0) roomVoicePeers.delete(roomId);
+      }
+      socket.to(roomId).emit('voice:peer_left', { playerId: socket.id, peerId: socket.id });
 
       // Mark player as temporarily disconnected in room
       roomManager.handlePlayerDisconnect(roomId, socket.id);
@@ -535,7 +578,12 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         disconnectTimers.delete(player.userId);
       }
 
-      sock.to(roomId).emit('voice:peer_left', { playerId: sock.id });
+      const voicePeers = roomVoicePeers.get(roomId);
+      if (voicePeers) {
+        voicePeers.delete(sock.id);
+        if (voicePeers.size === 0) roomVoicePeers.delete(roomId);
+      }
+      sock.to(roomId).emit('voice:peer_left', { playerId: sock.id, peerId: sock.id });
 
       const quitRes = roomManager.quitRoom(roomId, player?.userId || sock.id);
       sock.emit('room:left');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { voiceChat } from '../services/webrtc';
-import { Mic, MicOff, PhoneCall, Radio } from 'lucide-react';
+import { Mic, MicOff, PhoneCall, Radio, Volume2 } from 'lucide-react';
 import { sounds } from '../services/audio';
 
 interface VoiceChatBarProps {
@@ -9,21 +9,20 @@ interface VoiceChatBarProps {
 }
 
 export const VoiceChatBar: React.FC<VoiceChatBarProps> = ({ roomId, className }) => {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(() => voiceChat.getIsEnabled());
+  const [isMuted, setIsMuted] = useState(() => voiceChat.getIsMuted());
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [remoteSpeaking, setRemoteSpeaking] = useState(false);
 
   useEffect(() => {
+    // Keep UI state synchronized with the singleton voice chat service
+    setIsEnabled(voiceChat.getIsEnabled());
+    setIsMuted(voiceChat.getIsMuted());
+
     voiceChat.setCallbacks(
       speaking => setIsSpeaking(speaking),
-      () => {
-        // remote speaking change
-      }
+      (_peerId, speaking) => setRemoteSpeaking(speaking)
     );
-
-    return () => {
-      voiceChat.disableVoice();
-    };
   }, [roomId]);
 
   const toggleVoiceEnable = async () => {
@@ -39,6 +38,7 @@ export const VoiceChatBar: React.FC<VoiceChatBarProps> = ({ roomId, className })
       setIsEnabled(false);
       setIsMuted(false);
       setIsSpeaking(false);
+      setRemoteSpeaking(false);
     }
   };
 
@@ -91,10 +91,18 @@ export const VoiceChatBar: React.FC<VoiceChatBarProps> = ({ roomId, className })
         </button>
       )}
 
-      {/* Speaking Indicator */}
+      {/* Local Speaking Indicator */}
       {isEnabled && !isMuted && isSpeaking && (
         <span className="px-1.5 py-0.5 rounded-full bg-blue-500/30 border border-blue-400/50 text-[9px] text-blue-200 animate-pulse hidden lg:inline">
           Speaking...
+        </span>
+      )}
+
+      {/* Remote Opponent Speaking Indicator */}
+      {isEnabled && remoteSpeaking && !isSpeaking && (
+        <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-[9px] text-emerald-200 animate-pulse hidden lg:inline flex items-center gap-1">
+          <Volume2 className="w-2.5 h-2.5 text-emerald-300" />
+          Opponent speaking...
         </span>
       )}
     </div>
