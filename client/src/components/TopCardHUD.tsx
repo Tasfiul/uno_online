@@ -174,7 +174,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onCallCheck();
               }}
               title="Call Check if someone with 1 card forgot to call UNO"
-              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-200 hover:text-white font-black text-[11px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 hover:text-white font-black text-[11px] sm:text-xs shadow-[0_0_12px_rgba(6,182,212,0.25)] transition-all active:scale-95 tracking-wide whitespace-nowrap"
             >
               <span>CHECK</span>
             </button>
