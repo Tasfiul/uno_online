@@ -109,6 +109,10 @@ export const App: React.FC = () => {
       showToast(res.message);
     });
 
+    socket.on('game:error', ({ message }: { message: string }) => {
+      showToast(`⚠️ ${message}`);
+    });
+
     socket.on('game:game_over', ({ winner }: { winner?: any } = {}) => {
       setGameState(prev => {
         if (!prev) return null;
@@ -138,6 +142,7 @@ export const App: React.FC = () => {
       socket.off('game:state_update');
       socket.off('game:uno_called');
       socket.off('game:check_called');
+      socket.off('game:error');
       socket.off('game:game_over');
       socket.off('chat:message');
     };
@@ -285,6 +290,8 @@ export const App: React.FC = () => {
             onPassTurn={handlePassTurn}
             onCallUno={handleCallUno}
             onCallCheck={handleCallCheck}
+            myCardCount={myPlayer?.cards?.length ?? myPlayer?.cardCount ?? 0}
+            hasSaidUno={myPlayer?.hasSaidUno || false}
             handVisible={handVisible}
             onToggleHand={() => setHandVisible(!handVisible)}
             direction={gameState.direction}

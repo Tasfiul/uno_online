@@ -277,18 +277,36 @@ export class UnoGameEngine {
     return { success: true };
   }
 
-  public callUno(playerId: string): { success: boolean; message: string } {
-    const player = this.state.players.find(p => p.id === playerId);
-    if (!player) {
-      return { success: false, message: 'Player not found' };
+  public callUno(playerId: string): { success: boolean; message: string; error?: string } {
+    if (this.state.status !== 'playing') {
+      return { success: false, message: 'Game is not active', error: 'Game is not active' };
     }
 
-    // If player has 1 card (or 2 cards about to play down to 1), calling UNO protects them
-    if (player.cardCount <= 2) {
-      player.hasSaidUno = true;
-      if (this.state.unoVulnerablePlayerId === player.id) {
-        this.state.unoVulnerablePlayerId = null;
-      }
+    if (this.state.currentTurnPlayerId !== playerId) {
+      return {
+        success: false,
+        message: 'You can only call UNO on your turn before playing down to 1 card.',
+        error: 'You can only call UNO on your turn before playing down to 1 card.',
+      };
+    }
+
+    const player = this.state.players.find(p => p.id === playerId);
+    if (!player) {
+      return { success: false, message: 'Player not found', error: 'Player not found' };
+    }
+
+    if (player.cardCount > 2) {
+      return {
+        success: false,
+        message: 'You can only call UNO when you have 2 cards in hand.',
+        error: 'You can only call UNO when you have 2 cards in hand.',
+      };
+    }
+
+    // Player calls UNO on their turn with 2 cards (or 1 card)
+    player.hasSaidUno = true;
+    if (this.state.unoVulnerablePlayerId === player.id) {
+      this.state.unoVulnerablePlayerId = null;
     }
 
     this.state.lastActionMessage = `📢 ${player.username} called "UNO!"`;
@@ -302,18 +320,16 @@ export class UnoGameEngine {
     const checker = this.state.players.find(p => p.id === checkerId);
     const checkerName = checker ? checker.username : 'Unknown';
 
-    // Find any opponent who has 1 card and has NOT said UNO (or who is currently vulnerable)
+    // Find any opponent who ended their turn with 1 card without calling UNO
     const vulnerableOpponent = this.state.players.find(
-      p => p.id !== checkerId && (p.id === this.state.unoVulnerablePlayerId || (p.cardCount === 1 && !p.hasSaidUno))
+      p => p.id !== checkerId && p.id === this.state.unoVulnerablePlayerId
     );
 
     if (vulnerableOpponent) {
       // PENALIZE: Give 2 penalty cards
       this.giveCardsToPlayer(vulnerableOpponent.id, 2);
       vulnerableOpponent.hasSaidUno = false;
-      if (this.state.unoVulnerablePlayerId === vulnerableOpponent.id) {
-        this.state.unoVulnerablePlayerId = null;
-      }
+      this.state.unoVulnerablePlayerId = null;
 
       const msg = `⚡ CHECK! ${checkerName} caught ${vulnerableOpponent.username} without calling UNO! ${vulnerableOpponent.username} drew 2 penalty cards!`;
       this.state.lastActionMessage = msg;
@@ -352,9 +368,11 @@ export class UnoGameEngine {
       }
     }
     player.cardCount = player.cards.length;
-    player.hasSaidUno = false;
-    if (this.state.unoVulnerablePlayerId === player.id) {
-      this.state.unoVulnerablePlayerId = null;
+    if (player.cardCount > 1) {
+      player.hasSaidUno = false;
+      if (this.state.unoVulnerablePlayerId === player.id) {
+        this.state.unoVulnerablePlayerId = null;
+      }
     }
     this.state.drawPileCount = this.drawPile.length;
   }
@@ -375,10 +393,17 @@ export class UnoGameEngine {
     for (let i = 0; i < this.state.players.length; i++) {
       this.state.players[i].isTurn = i === index;
     }
-    this.state.currentTurnPlayerId = this.state.players[index].id;
+    const nextPlayer = this.state.players[index];
+    this.state.currentTurnPlayerId = nextPlayer.id;
     this.state.turnStartTime = Date.now();
     this.drawnThisTurn = false;
     this.state.hasDrawnThisTurn = false;
+
+    // If nextPlayer ended their previous turn with 1 card without calling UNO,
+    // their vulnerability window expires now that it is their turn again!
+    if (this.state.unoVulnerablePlayerId === nextPlayer.id) {
+      this.state.unoVulnerablePlayerId = null;
+    }
   }
 
   public getSanitizedStateForPlayer(forPlayerId: string): GameState {

@@ -335,6 +335,11 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       if (!engine) return;
 
       const result = engine.callUno(socket.id);
+      if (!result.success) {
+        socket.emit('game:error', { message: result.error || result.message });
+        return;
+      }
+
       const player = socketPlayerMap.get(socket.id);
 
       io.to(roomId).emit('game:uno_called', {
