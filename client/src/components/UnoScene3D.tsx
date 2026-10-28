@@ -299,18 +299,29 @@ function createHumanoidPlayerModel(
   // ==========================================
   const chairGroup = new THREE.Group();
 
-  // Seat Cushion
-  const seatGeo = new THREE.CylinderGeometry(0.85, 0.9, 0.22, 28);
+  // Seat Cushion (Contoured ergonomic seat positioned cleanly under the body without clipping into table)
+  const seatGeo = new THREE.BoxGeometry(1.08, 0.16, 0.82);
   const seatMat = new THREE.MeshStandardMaterial({
     color: 0x161922,
     roughness: 0.5,
     metalness: 0.15,
   });
   const seat = new THREE.Mesh(seatGeo, seatMat);
-  seat.position.y = 0.11;
+  seat.position.set(0, 0.14, 0.24);
   if (!isMobile) seat.castShadow = true;
   seat.receiveShadow = true;
   chairGroup.add(seat);
+
+  // Chair Heavy Metal Stem / Pedestal down to casino floor
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.3 });
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.84, 12), stemMat);
+  stem.position.set(0, -0.85, 0.24);
+  chairGroup.add(stem);
+
+  // Chair Pedestal Base on floor
+  const chairBase = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.62, 0.08, 24), stemMat);
+  chairBase.position.set(0, -1.74, 0.24);
+  chairGroup.add(chairBase);
 
   // Chair Backrest (High-back executive gaming chair)
   const backGeo = new THREE.BoxGeometry(1.25, 1.75, 0.18);
@@ -360,9 +371,9 @@ function createHumanoidPlayerModel(
   });
 
   // Torso / Jacket
-  const torsoGeo = new THREE.CylinderGeometry(0.46, 0.58, 1.05, isMobile ? 16 : 24);
+  const torsoGeo = new THREE.CylinderGeometry(0.44, 0.52, 1.05, isMobile ? 16 : 24);
   const torso = new THREE.Mesh(torsoGeo, clothMat);
-  torso.position.y = 0.75;
+  torso.position.y = 0.78;
   torso.castShadow = true;
   bodyGroup.add(torso);
 
@@ -370,21 +381,21 @@ function createHumanoidPlayerModel(
   const shouldersGeo = new THREE.CylinderGeometry(0.24, 0.24, 1.15, 14);
   shouldersGeo.rotateZ(Math.PI / 2);
   const shoulders = new THREE.Mesh(shouldersGeo, clothMat);
-  shoulders.position.set(0, 1.25, 0.02);
+  shoulders.position.set(0, 1.28, 0.02);
   if (!isMobile) shoulders.castShadow = true;
   bodyGroup.add(shoulders);
 
   // Arms extending forward towards table
-  const armGeo = new THREE.CylinderGeometry(0.12, 0.1, 0.68, 14);
-  armGeo.rotateX(-Math.PI / 3.8); // angled forward towards table edge
+  const armGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.74, 14);
+  armGeo.rotateX(-Math.PI / 3.7); // angled forward towards table edge
 
   const leftArm = new THREE.Mesh(armGeo, clothMat);
-  leftArm.position.set(-0.52, 0.95, -0.22);
+  leftArm.position.set(-0.50, 0.96, -0.20);
   if (!isMobile) leftArm.castShadow = true;
   bodyGroup.add(leftArm);
 
   const rightArm = new THREE.Mesh(armGeo, clothMat);
-  rightArm.position.set(0.52, 0.95, -0.22);
+  rightArm.position.set(0.50, 0.96, -0.20);
   if (!isMobile) rightArm.castShadow = true;
   bodyGroup.add(rightArm);
 
@@ -392,16 +403,16 @@ function createHumanoidPlayerModel(
   const skinMat = new THREE.MeshStandardMaterial({ color: 0xf5d0b0, roughness: 0.5 });
   const handGeo = new THREE.SphereGeometry(0.12, 12, 12);
   const leftHand = new THREE.Mesh(handGeo, skinMat);
-  leftHand.position.set(-0.24, 0.64, -0.56);
+  leftHand.position.set(-0.24, 0.62, -0.62);
   bodyGroup.add(leftHand);
 
   const rightHand = new THREE.Mesh(handGeo, skinMat);
-  rightHand.position.set(0.24, 0.64, -0.56);
+  rightHand.position.set(0.24, 0.62, -0.62);
   bodyGroup.add(rightHand);
 
   // 3D Fan of Cards held in hands (Upright, tilted naturally back towards player's chest)
   const fanGroup = new THREE.Group();
-  fanGroup.position.set(0, 0.66, -0.55); // centered at player's hands
+  fanGroup.position.set(0, 0.64, -0.62); // centered at player's hands
   rebuildCardFan(fanGroup, player.cardCount, cardBackMat, isMobile);
   bodyGroup.add(fanGroup);
 
@@ -409,10 +420,10 @@ function createHumanoidPlayerModel(
 
   // ==========================================
   // 3. HUMANOID HEAD & HEADSET (Pivots with player gaze)
-  // Pivot placed at base of neck (y = 1.45)
+  // Pivot placed at base of neck (y = 1.48)
   // ==========================================
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 1.45, 0);
+  headGroup.position.set(0, 1.48, 0);
 
   // Neck
   const neckGeo = new THREE.CylinderGeometry(0.16, 0.18, 0.25, 16);
@@ -503,9 +514,9 @@ function createHumanoidPlayerModel(
   group.add(headGroup);
 
   // ==========================================
-  // 4. TURN GLOW & HALO (Always attached, visibility toggled with isTurn)
+  // 4. TURN GLOW & FLOOR HALO (Positioned on casino rug under chair, toggled with isTurn)
   // ==========================================
-  const haloGeo = new THREE.RingGeometry(0.95, 1.25, 32);
+  const haloGeo = new THREE.RingGeometry(0.72, 1.05, 32);
   haloGeo.rotateX(-Math.PI / 2);
   const haloMat = new THREE.MeshBasicMaterial({
     color: 0x38bdf8,
@@ -514,18 +525,18 @@ function createHumanoidPlayerModel(
     opacity: 0.8,
   });
   const halo = new THREE.Mesh(haloGeo, haloMat);
-  halo.position.y = 0.01;
+  halo.position.set(0, -1.76, 0.24);
   halo.visible = isTurn;
   group.add(halo);
 
   // ==========================================
-  // 5. FLOATING 2D INFO BADGE (Username & Card Count)
+  // 5. FLOATING 2D INFO BADGE (Username & Status)
   // In Three.js, a Sprite always faces the camera directly
   // ==========================================
   const badgeTex = createBadgeTexture(player, isTurn);
   const spriteMat = new THREE.SpriteMaterial({ map: badgeTex });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.position.set(0, 2.95, 0);
+  sprite.position.set(0, 3.0, 0);
   sprite.scale.set(2.2, 0.69, 1);
   group.add(sprite);
 
@@ -593,7 +604,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
   const lastEmittedLook = useRef({ yaw: 0, pitch: 0, time: 0 });
 
   // Fixed seat position of current player at table South
-  const CAMERA_EYE_POSITION = new THREE.Vector3(0, 1.95, 5.4);
+  const CAMERA_EYE_POSITION = new THREE.Vector3(0, 1.95, 5.85);
 
   // Clamped rotation angles: enough to look around at opponents without 360° spinning
   const YAW_MIN = -1.15; // ~ -66 degrees (left opponents)
@@ -1115,7 +1126,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       sortedPlayers.unshift(mine);
     }
 
-    const radius = 5.3; // Table edge distance
+    const radius = 5.85; // Table edge distance (comfortably seated outside table rim without clipping)
     const currentActiveIds = new Set<string>();
     const isMobile = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
 
