@@ -126,7 +126,7 @@ function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): T
   canvas.height = 256;
   const ctx = canvas.getContext('2d')!;
 
-  // Default humanoid illustration (clean fallback before async image loads)
+  // Default user initial placeholder (clean fallback before async avatar image loads)
   function drawFallbackHumanoid() {
     ctx.clearRect(0, 0, 256, 256);
     ctx.fillStyle = '#0f172a';
@@ -141,47 +141,12 @@ function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): T
     ctx.strokeStyle = '#38bdf8';
     ctx.stroke();
 
-    // Humanoid head & hair
-    ctx.beginPath();
-    ctx.arc(128, 110, 52, 0, Math.PI * 2);
-    ctx.fillStyle = '#fed7aa'; // warm skin tone
-    ctx.fill();
-
-    // Hair
-    ctx.beginPath();
-    ctx.arc(128, 98, 52, Math.PI * 0.9, Math.PI * 2.1);
-    ctx.fillStyle = '#1e1b4b';
-    ctx.fill();
-
-    // Eyes
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.arc(110, 110, 6, 0, Math.PI * 2);
-    ctx.arc(146, 110, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Friendly smile
-    ctx.beginPath();
-    ctx.arc(128, 124, 16, 0.2, Math.PI - 0.2);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#9a3412';
-    ctx.stroke();
-
-    // Shirt collar
-    ctx.beginPath();
-    ctx.moveTo(90, 180);
-    ctx.lineTo(128, 155);
-    ctx.lineTo(166, 180);
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = '#38bdf8';
-    ctx.stroke();
-
-    // Initial badge
+    // User initial
     ctx.fillStyle = '#38bdf8';
-    ctx.font = 'bold 36px sans-serif';
+    ctx.font = 'bold 72px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(username.charAt(0).toUpperCase(), 128, 205);
+    ctx.fillText(username.charAt(0).toUpperCase(), 128, 128);
   }
 
   drawFallbackHumanoid();
@@ -463,16 +428,6 @@ function createHumanoidPlayerModel(
   head.castShadow = true;
   headGroup.add(head);
 
-  // Hair on top and back of head
-  const hairGeo = new THREE.SphereGeometry(0.448, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.52);
-  const hairMat = new THREE.MeshStandardMaterial({
-    color: 0x18181b, // stylish dark hair
-    roughness: 0.7,
-  });
-  const hair = new THREE.Mesh(hairGeo, hairMat);
-  hair.position.set(0, 0.38, 0.01);
-  headGroup.add(hair);
-
   // Face Display (Curved seamlessly along the front of the head)
   const avatarTex = createAvatarTexture(player.avatar, player.username);
   // Curved front shell geometry matching the head's exact curvature
@@ -570,7 +525,7 @@ function createHumanoidPlayerModel(
   const badgeTex = createBadgeTexture(player, isTurn);
   const spriteMat = new THREE.SpriteMaterial({ map: badgeTex });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.position.set(0, 2.45, 0);
+  sprite.position.set(0, 2.95, 0);
   sprite.scale.set(2.2, 0.69, 1);
   group.add(sprite);
 
