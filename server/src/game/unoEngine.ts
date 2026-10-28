@@ -30,21 +30,17 @@ export class UnoGameEngine {
       }
     }
 
-    // Determine initial top card (not Wild Draw 4)
+    // Determine initial top card: if it is a power card or wild, reshuffle back into deck until a regular number card is drawn
     let initialTopCard = this.drawFromPile()!;
-    while (initialTopCard.type === 'wild4') {
-      this.drawPile.unshift(initialTopCard);
+    while (initialTopCard.type !== 'number') {
+      this.drawPile.push(initialTopCard);
       this.drawPile = shuffleDeck(this.drawPile);
       initialTopCard = this.drawFromPile()!;
     }
 
     this.discardPile.push(initialTopCard);
 
-    let startingColor: CardColor = initialTopCard.color;
-    if (startingColor === 'wild') {
-      const colors: CardColor[] = ['red', 'yellow', 'green', 'blue'];
-      startingColor = colors[Math.floor(Math.random() * colors.length)];
-    }
+    const startingColor: CardColor = initialTopCard.color;
 
     this.state = {
       roomId,
@@ -57,7 +53,7 @@ export class UnoGameEngine {
       currentColor: startingColor,
       winner: null,
       unoVulnerablePlayerId: null,
-      lastActionMessage: `Game started! Top card is ${initialTopCard.color.toUpperCase()} ${initialTopCard.value >= 0 ? initialTopCard.value : initialTopCard.type.toUpperCase()}`,
+      lastActionMessage: `Game started! Top card is ${initialTopCard.color.toUpperCase()} ${initialTopCard.value}`,
       turnStartTime: Date.now(),
       hasDrawnThisTurn: false,
     };
