@@ -46,12 +46,18 @@ export const App: React.FC = () => {
     if (!currentUser) return;
 
     connectSocket();
-    socket.emit('rooms:list');
 
-    // Persistence: If user was previously in a room, attempt to reconnect
-    const savedRoomId = localStorage.getItem('uno_active_room_id');
-    if (savedRoomId) {
-      socket.emit('room:reconnect', { roomId: savedRoomId, user: currentUser });
+    const onConnect = () => {
+      socket.emit('rooms:list');
+      const savedRoomId = localStorage.getItem('uno_active_room_id');
+      if (savedRoomId) {
+        socket.emit('room:reconnect', { roomId: savedRoomId, user: currentUser });
+      }
+    };
+
+    socket.on('connect', onConnect);
+    if (socket.connected) {
+      onConnect();
     }
 
     socket.on('rooms:list_response', (rooms: PublicRoomInfo[]) => {
@@ -131,6 +137,7 @@ export const App: React.FC = () => {
     });
 
     return () => {
+      socket.off('connect', onConnect);
       socket.off('rooms:list_response');
       socket.off('room:created');
       socket.off('room:joined');

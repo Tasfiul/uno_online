@@ -11,6 +11,14 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
   // Disconnect grace timers: userId -> NodeJS.Timeout (15s window to refresh / reconnect)
   const disconnectTimers = new Map<string, NodeJS.Timeout>();
   const DISCONNECT_GRACE_MS = 15000; // 15 seconds grace window
+
+  function clearUserDisconnectTimer(userId?: string) {
+    if (!userId) return;
+    if (disconnectTimers.has(userId)) {
+      clearTimeout(disconnectTimers.get(userId)!);
+      disconnectTimers.delete(userId);
+    }
+  }
   // Active room head-tracking look directions: roomId -> Map<playerId, { yaw: number, pitch: number }>
   const roomPlayerLooks = new Map<string, Map<string, { yaw: number; pitch: number }>>();
   // Active room WebRTC voice chat members: roomId -> Set<socket.id>
@@ -62,13 +70,11 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       if (!roomId || !user?.id) return;
 
       // Clear any pending disconnect timer for this user
-      if (disconnectTimers.has(user.id)) {
-        clearTimeout(disconnectTimers.get(user.id)!);
-        disconnectTimers.delete(user.id);
-      }
+      clearUserDisconnectTimer(user.id);
 
       const result = roomManager.reconnectPlayer(roomId, user.id, socket.id);
       if (result.success && result.room && result.player) {
+        clearUserDisconnectTimer(result.player.userId);
         socketRoomMap.set(socket.id, roomId);
         socketPlayerMap.set(socket.id, result.player);
         socket.join(roomId);
@@ -78,7 +84,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
 
         if (result.engine) {
           if (result.engine.state.status === 'playing') {
-            result.engine.state.lastActionMessage = ` ${result.player.username} reconnected to the match!`;
+            result.engine.state.lastActionMessage = `✨ ${result.player.username} reconnected to the match!`;
           }
           // Immediately send sanitized game state to the reconnected player
           const sanitized = result.engine.getSanitizedStateForPlayer(socket.id);
@@ -272,6 +278,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     socket.on('game:play_card', (payload: { cardId: string; chosenColor?: any }) => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId) return;
+      clearUserDisconnectTimer(socketPlayerMap.get(socket.id)?.userId);
 
       const engine = roomManager.getGameEngine(roomId);
       if (!engine) return;
@@ -296,6 +303,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     socket.on('game:draw_card', () => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId) return;
+      clearUserDisconnectTimer(socketPlayerMap.get(socket.id)?.userId);
 
       const engine = roomManager.getGameEngine(roomId);
       if (!engine) return;
@@ -313,6 +321,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     socket.on('game:pass_turn', () => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId) return;
+      clearUserDisconnectTimer(socketPlayerMap.get(socket.id)?.userId);
 
       const engine = roomManager.getGameEngine(roomId);
       if (!engine) return;
@@ -330,6 +339,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     socket.on('game:call_uno', () => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId) return;
+      clearUserDisconnectTimer(socketPlayerMap.get(socket.id)?.userId);
 
       const engine = roomManager.getGameEngine(roomId);
       if (!engine) return;
@@ -355,6 +365,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     socket.on('game:call_check', () => {
       const roomId = socketRoomMap.get(socket.id);
       if (!roomId) return;
+      clearUserDisconnectTimer(socketPlayerMap.get(socket.id)?.userId);
 
       const engine = roomManager.getGameEngine(roomId);
       if (!engine) return;
@@ -385,6 +396,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       const roomId = socketRoomMap.get(socket.id);
       const player = socketPlayerMap.get(socket.id);
       if (!roomId || !player || !payload.text || payload.text.trim().length === 0) return;
+      clearUserDisconnectTimer(player.userId);
 
       const message: ChatMessage = {
         id: uuidv4(),
@@ -525,11 +537,21 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       }
       socket.to(roomId).emit('voice:peer_left', { playerId: socket.id, peerId: socket.id });
 
+      const userId = player.userId;
+      const targetRoom = roomManager.getRoom(roomId);
+
+      // Check if user has already reconnected to this room on another socket (e.g. fast page refresh)
+      const activePlayerInRoom = targetRoom?.players.find(p => p.userId === userId);
+      if (activePlayerInRoom && activePlayerInRoom.isConnected && activePlayerInRoom.id !== socket.id) {
+        // User already reconnected on activePlayerInRoom.id!
+        // This disconnect is just the stale socket from page refresh. Do NOT start a timer or post warning!
+        return;
+      }
+
       // Mark player as temporarily disconnected in room
       roomManager.handlePlayerDisconnect(roomId, socket.id);
       broadcastRoomUpdate(roomId);
 
-      const userId = player.userId;
       const engine = roomManager.getGameEngine(roomId);
 
       // In an active match, notify remaining players immediately
@@ -538,10 +560,21 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       }
       broadcastGameState(roomId);
 
+      // Clear any existing timer for this user before setting a new one
+      clearUserDisconnectTimer(userId);
+
       // 15-second grace window to allow page refresh / reconnecting
-      // If user merely reloads page, they reconnect in ~1-3s; if they closed tab, remaining player wins in 15s
       const timer = setTimeout(() => {
         disconnectTimers.delete(userId);
+
+        // Verify player did NOT reconnect in the meantime
+        const currentRoom = roomManager.getRoom(roomId);
+        const playerNow = currentRoom?.players.find(p => p.userId === userId);
+        if (playerNow && playerNow.isConnected) {
+          // Player reconnected and is actively playing! Do NOT quit!
+          return;
+        }
+
         // Grace period expired: execute complete quit
         const quitRes = roomManager.quitRoom(roomId, userId);
         if (quitRes.removedPlayer) {

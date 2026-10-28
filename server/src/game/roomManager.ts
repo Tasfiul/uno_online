@@ -192,6 +192,10 @@ export class RoomManager {
       if (engine.state.unoVulnerablePlayerId === oldSocketId) {
         engine.state.unoVulnerablePlayerId = newSocketId;
       }
+
+      if (engine.state.lastPlayedBy === oldSocketId) {
+        engine.state.lastPlayedBy = newSocketId;
+      }
     }
 
     return { success: true, room, engine, player };
