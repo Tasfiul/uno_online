@@ -205,22 +205,22 @@ function createAvatarTexture(avatarUrl?: string, username: string = 'Player'): T
   return texture;
 }
 
-// Procedural 2D Glassmorphic Badge Texture for Floating Player Info (Overhead Name Title)
+// Procedural 2D Solid Badge Texture for Floating Player Info (Overhead Name Title)
 function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 384;
   canvas.height = 120;
   const ctx = canvas.getContext('2d')!;
 
-  // Background rounded capsule
-  ctx.fillStyle = isTurn ? 'rgba(2, 132, 199, 0.94)' : 'rgba(15, 23, 42, 0.90)';
+  // 100% Solid opaque background - no transparency / no glassmorphism
+  ctx.fillStyle = isTurn ? '#0284c7' : '#0f172a';
   ctx.beginPath();
-  ctx.roundRect(10, 10, 364, 100, 26);
+  ctx.roundRect(8, 8, 368, 104, 20);
   ctx.fill();
 
-  // Border (Gold when turn active)
-  ctx.lineWidth = isTurn ? 5 : 3;
-  ctx.strokeStyle = isTurn ? '#facc15' : 'rgba(255, 255, 255, 0.25)';
+  // Solid crisp border
+  ctx.lineWidth = isTurn ? 6 : 4;
+  ctx.strokeStyle = isTurn ? '#facc15' : '#475569';
   ctx.stroke();
 
   // If isTurn, draw a golden banner at top

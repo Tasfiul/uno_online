@@ -210,31 +210,31 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
         {/* Tier 2: Centered Turn Alert Banner & Action Message */}
         <div className="pointer-events-auto flex flex-col items-center justify-center w-full">
           <div
-            className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full border backdrop-blur-md shadow-lg transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-full border-2 shadow-xl transition-all flex items-center gap-2 ${
               isMyTurn
-                ? 'bg-amber-500/90 border-amber-300 text-black font-black shadow-amber-500/25'
-                : 'glass-panel border-white/10 text-white font-semibold text-xs'
+                ? 'bg-amber-400 border-amber-300 text-black font-black'
+                : 'bg-slate-900 border-slate-700 text-white font-bold text-xs sm:text-sm'
             }`}
           >
             {isMyTurn ? (
               <>
-                <Sparkles className="w-3 h-3 text-black animate-spin" />
+                <Sparkles className="w-3.5 h-3.5 text-black" />
                 <span className="text-xs sm:text-sm tracking-wide font-black">IT'S YOUR TURN!</span>
               </>
             ) : (
               <>
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />
-                <span className="text-[11px] sm:text-xs text-slate-200">
-                  <span className="text-white font-bold">{currentTurnPlayerName}</span>'s turn
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
+                <span className="text-xs sm:text-sm text-slate-200">
+                  <span className="text-white font-black">{currentTurnPlayerName}</span>'s turn
                 </span>
               </>
             )}
           </div>
 
           {lastActionMessage && (
-            <div className="mt-2.5 max-w-[92vw] sm:max-w-lg px-4 py-1.5 sm:px-5 sm:py-2 rounded-2xl bg-slate-900/95 backdrop-blur-md border border-cyan-400/50 text-white text-xs sm:text-sm font-bold text-center shadow-[0_4px_25px_rgba(0,0,0,0.8),0_0_15px_rgba(6,182,212,0.35)] flex items-center justify-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0 shadow-[0_0_8px_#22d3ee]" />
-              <span className="tracking-wide">{lastActionMessage}</span>
+            <div className="mt-2.5 max-w-[92vw] sm:max-w-lg px-4 py-2 sm:px-6 sm:py-2.5 rounded-2xl bg-black border-2 border-amber-400 text-amber-300 text-xs sm:text-sm font-black text-center shadow-2xl flex items-center justify-center gap-2.5 tracking-wide">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+              <span className="text-white font-black">{lastActionMessage}</span>
             </div>
           )}
         </div>
