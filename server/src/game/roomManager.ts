@@ -77,6 +77,15 @@ export class RoomManager {
     return this.rooms.get(roomId);
   }
 
+  public findRoomBySocketOrUserId(id: string): Room | undefined {
+    if (!id) return undefined;
+    for (const room of this.rooms.values()) {
+      const match = room.players.find(p => p.id === id || p.userId === id);
+      if (match) return room;
+    }
+    return undefined;
+  }
+
   public findPrivateRoomByPassword(password: string): Room | undefined {
     const trimmedPw = password.trim();
     for (const room of this.rooms.values()) {

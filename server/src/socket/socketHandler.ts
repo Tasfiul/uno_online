@@ -501,32 +501,67 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
 
     // 14. Realtime First-Person Head Movement / Look Tracking
     socket.on('player:look', (payload: { yaw: number; pitch: number; userId?: string }) => {
-      const roomId = socketRoomMap.get(socket.id);
-      if (!roomId || typeof payload?.yaw !== 'number' || typeof payload?.pitch !== 'number') return;
+      if (
+        !payload ||
+        typeof payload.yaw !== 'number' ||
+        typeof payload.pitch !== 'number' ||
+        Number.isNaN(payload.yaw) ||
+        Number.isNaN(payload.pitch)
+      ) {
+        return;
+      }
+
+      let roomId = socketRoomMap.get(socket.id);
+      if (!roomId) {
+        const found = roomManager.findRoomBySocketOrUserId(socket.id) ||
+          (payload.userId ? roomManager.findRoomBySocketOrUserId(payload.userId) : undefined);
+        if (found) {
+          roomId = found.id;
+          socketRoomMap.set(socket.id, roomId);
+          socket.join(roomId);
+          const p = found.players.find(pl => pl.id === socket.id || (payload.userId && pl.userId === payload.userId));
+          if (p) {
+            socketPlayerMap.set(socket.id, p);
+          }
+        }
+      }
+      if (!roomId) return;
 
       const player = socketPlayerMap.get(socket.id);
       const userId = player?.userId || payload?.userId;
+
+      // Bound yaw and pitch within physical viewing limits
+      const safeYaw = Math.max(-2.5, Math.min(2.5, payload.yaw));
+      const safePitch = Math.max(-1.5, Math.min(1.5, payload.pitch));
 
       let roomLooks = roomPlayerLooks.get(roomId);
       if (!roomLooks) {
         roomLooks = new Map();
         roomPlayerLooks.set(roomId, roomLooks);
       }
-      roomLooks.set(socket.id, { yaw: payload.yaw, pitch: payload.pitch, userId });
+      roomLooks.set(socket.id, { yaw: safeYaw, pitch: safePitch, userId });
       if (userId) {
-        roomLooks.set(userId, { yaw: payload.yaw, pitch: payload.pitch, userId });
+        roomLooks.set(userId, { yaw: safeYaw, pitch: safePitch, userId });
       }
 
       socket.to(roomId).emit('player:looked', {
         playerId: socket.id,
         userId: userId,
-        yaw: payload.yaw,
-        pitch: payload.pitch,
+        yaw: safeYaw,
+        pitch: safePitch,
       });
     });
 
     socket.on('player:get_looks', () => {
-      const roomId = socketRoomMap.get(socket.id);
+      let roomId = socketRoomMap.get(socket.id);
+      if (!roomId) {
+        const found = roomManager.findRoomBySocketOrUserId(socket.id);
+        if (found) {
+          roomId = found.id;
+          socketRoomMap.set(socket.id, roomId);
+          socket.join(roomId);
+        }
+      }
       if (!roomId) return;
       const roomLooks = roomPlayerLooks.get(roomId);
       if (roomLooks && roomLooks.size > 0) {

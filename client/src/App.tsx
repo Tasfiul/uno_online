@@ -16,6 +16,7 @@ import { sounds } from './services/audio';
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [socketId, setSocketId] = useState<string>(socket.id || '');
   const [publicRooms, setPublicRooms] = useState<PublicRoomInfo[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -84,6 +85,7 @@ export const App: React.FC = () => {
     connectSocket();
 
     const onConnect = () => {
+      setSocketId(socket.id || '');
       socket.emit('rooms:list');
       const savedRoomId = localStorage.getItem('uno_active_room_id');
       if (savedRoomId) {
@@ -93,6 +95,7 @@ export const App: React.FC = () => {
 
     socket.on('connect', onConnect);
     if (socket.connected) {
+      setSocketId(socket.id || '');
       onConnect();
     }
 
@@ -375,7 +378,7 @@ export const App: React.FC = () => {
       ) : (
         <div className="relative w-full h-full">
           {/* 3D Canvas with Three.js */}
-          <UnoScene3D gameState={gameState} myPlayerId={socket.id || ''} myUserId={currentUser?.id || ''} />
+          <UnoScene3D gameState={gameState} myPlayerId={socketId || socket.id || ''} myUserId={currentUser?.id || ''} />
 
           {/* Top HUD: Top card preview, turn status, Uno/Check buttons, Draw card button, Quit button, integrated Voice & Chat */}
           <TopCardHUD
