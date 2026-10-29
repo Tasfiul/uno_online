@@ -229,11 +229,21 @@ function getCuteFaceTexture(): THREE.CanvasTexture {
   return cuteFaceTexture;
 }
 
+function getHighResAvatarUrl(url: string): string {
+  if (!url) return url;
+  // If it's a DiceBear avatar, ensure high-resolution SVG rendering (size=512)
+  if (url.includes('api.dicebear.com') && !url.includes('size=')) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}size=512`;
+  }
+  return url;
+}
+
 // Procedural 2D Solid Badge Texture for Floating Player Info with User Avatar Image & Name
 function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTexture {
   const logicalWidth = 460;
   const logicalHeight = 124;
-  const scale = 2.5; // High-DPI crisp scale (1150x310) for sharp text and avatars on mobile & desktop without GPU lag
+  const scale = 3.0; // Ultra-crisp 3x resolution (1380x372) for razor-sharp avatars and text
   const FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
   const canvas = document.createElement('canvas');
@@ -242,15 +252,16 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
   const ctx = canvas.getContext('2d')!;
 
   const tex = new THREE.CanvasTexture(canvas);
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  // Disable mipmaps on 2D badge sprite: prevents GPU from selecting low-res blurry mip levels at distance!
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = 4;
 
-  const effectiveUrl =
+  const rawUrl =
     player.avatar && (player.avatar.startsWith('data:') || player.avatar.startsWith('http'))
       ? player.avatar
       : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(player.username)}&backgroundColor=b6e3f4`;
+  const effectiveUrl = getHighResAvatarUrl(rawUrl);
 
   function render(avatarImg?: HTMLImageElement) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -272,11 +283,11 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
     ctx.stroke();
 
     // Measure name and layout dynamically so [Avatar + Name] are centered together
-    const avatarRadius = 40;
-    const avatarDiameter = avatarRadius * 2; // 80px
-    const gap = 14; // gap between avatar and text
+    const avatarRadius = 46; // Larger, more prominent avatar (92px diameter)
+    const avatarDiameter = avatarRadius * 2;
+    const gap = 16; // gap between avatar and text
     const minPadding = 18;
-    const maxTextWidth = logicalWidth - (minPadding * 2) - avatarDiameter - gap; // ~330px max
+    const maxTextWidth = logicalWidth - (minPadding * 2) - avatarDiameter - gap;
 
     let displayName = player.username;
     let nameFontSize = isTurn ? 32 : 36;
@@ -314,40 +325,56 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
     const textStartX = startX + avatarDiameter + gap;
 
     // 2. User Avatar in Circular Frame
+    const innerRadius = avatarRadius - 2.5;
+
+    // Subtle drop shadow / glow behind avatar circle for crisp depth
     ctx.save();
-    // Inner dark circle
+    ctx.shadowColor = isTurn ? 'rgba(250, 204, 21, 0.5)' : 'rgba(56, 189, 248, 0.4)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 1;
+
+    // Glowing avatar border ring (underneath)
     ctx.beginPath();
     ctx.arc(cx, cy, avatarRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e293b';
+    ctx.lineWidth = isTurn ? 4.5 : 3.5;
+    ctx.strokeStyle = isTurn ? '#facc15' : '#38bdf8';
+    ctx.stroke();
+    ctx.restore();
+
+    // Inner dark circle background
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
     ctx.fill();
 
     if (avatarImg && avatarImg.complete && avatarImg.naturalWidth > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, avatarRadius - 2, 0, Math.PI * 2);
+      ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
       ctx.clip();
       ctx.drawImage(
         avatarImg,
-        cx - (avatarRadius - 2),
-        cy - (avatarRadius - 2),
-        (avatarRadius - 2) * 2,
-        (avatarRadius - 2) * 2
+        cx - innerRadius,
+        cy - innerRadius,
+        innerRadius * 2,
+        innerRadius * 2
       );
       ctx.restore();
     } else {
       // Clean fallback initial
       ctx.fillStyle = '#38bdf8';
-      ctx.font = `bold 42px ${FONT_FAMILY}`;
+      ctx.font = `bold 44px ${FONT_FAMILY}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(player.username.charAt(0).toUpperCase(), cx, cy);
     }
 
-    // Glowing avatar border ring
+    // Crisp inner border outline over the avatar image edge
     ctx.beginPath();
-    ctx.arc(cx, cy, avatarRadius, 0, Math.PI * 2);
-    ctx.lineWidth = isTurn ? 4 : 3.5;
-    ctx.strokeStyle = isTurn ? '#facc15' : '#38bdf8';
+    ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.stroke();
     ctx.restore();
 
