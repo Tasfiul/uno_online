@@ -55,15 +55,15 @@ export const VoiceChatBar: React.FC<VoiceChatBarProps> = ({ roomId, className })
       {/* Voice Chat Toggle Button */}
       <button
         onClick={toggleVoiceEnable}
-        className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 shadow-xl transition-all active:scale-95 ${
+        className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl border-2 text-xs font-bold flex items-center gap-1.5 shadow-md transition-all active:translate-y-[2px] active:border-b-2 cursor-pointer select-none ${
           isEnabled
-            ? 'bg-emerald-600/90 hover:bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20'
-            : 'glass-panel hover:bg-slate-800/90 border-white/10 text-slate-300'
+            ? 'bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 border-emerald-300 border-b-[3px] sm:border-b-4 border-b-emerald-800 text-slate-950'
+            : 'bg-gradient-to-b from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 border-slate-500 border-b-[3px] sm:border-b-4 border-b-slate-950 text-slate-200'
         }`}
       >
         {isEnabled ? (
           <>
-            <Radio className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+            <Radio className="w-3.5 h-3.5 text-emerald-950 animate-pulse" />
             <span className="hidden sm:inline">Voice On</span>
           </>
         ) : (
@@ -79,12 +79,12 @@ export const VoiceChatBar: React.FC<VoiceChatBarProps> = ({ roomId, className })
         <button
           onClick={toggleMute}
           title={isMuted ? 'Unmute Microphone' : 'Mute Microphone'}
-          className={`p-1.5 sm:p-2 rounded-xl border transition-all active:scale-95 ${
+          className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border-2 transition-all active:translate-y-[2px] active:border-b-2 cursor-pointer select-none ${
             isMuted
-              ? 'bg-red-500/80 hover:bg-red-500 border-red-400 text-white'
+              ? 'bg-gradient-to-b from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 border-red-300 border-b-[3px] sm:border-b-4 border-b-red-950 text-white'
               : isSpeaking
-              ? 'bg-blue-600 border-blue-300 text-white shadow-[0_0_15px_rgba(59,130,246,0.8)]'
-              : 'glass-panel hover:bg-slate-800 border-white/10 text-slate-200'
+              ? 'bg-gradient-to-b from-blue-500 to-blue-600 border-blue-200 border-b-[3px] sm:border-b-4 border-b-blue-900 text-white shadow-[0_0_15px_rgba(59,130,246,0.8)]'
+              : 'bg-gradient-to-b from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 border-slate-500 border-b-[3px] sm:border-b-4 border-b-slate-950 text-slate-200'
           }`}
         >
           {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}

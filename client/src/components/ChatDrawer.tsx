@@ -9,6 +9,7 @@ interface ChatDrawerProps {
   isOpen: boolean;
   onToggle: () => void;
   showTriggerButton?: boolean;
+  unreadCount?: number;
 }
 
 export const ChatDrawer: React.FC<ChatDrawerProps> = ({
@@ -17,6 +18,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({
   isOpen,
   onToggle,
   showTriggerButton = true,
+  unreadCount,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isChatMuted, setIsChatMuted] = useState(false);
@@ -53,8 +55,11 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({
         >
           <MessageSquare className="w-4 h-4 text-blue-400" />
           <span className="hidden sm:inline">Live Chat</span>
-          {messages.length > 0 && !isOpen && (
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+          {(unreadCount !== undefined ? unreadCount > 0 : messages.length > 0) && !isOpen && (
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
+            </span>
           )}
         </button>
       )}

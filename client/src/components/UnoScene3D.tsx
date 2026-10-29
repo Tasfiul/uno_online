@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { GameState, Player, UnoCard } from '../types';
 import { socket } from '../services/socket';
+import { sounds } from '../services/audio';
 
 interface UnoScene3DProps {
   gameState: GameState;
@@ -389,6 +390,40 @@ interface HumanoidModelRig {
 // Reusable immutable geometry for held cards (prevents allocation spikes)
 const sharedHeldCardGeo = new THREE.PlaneGeometry(0.72, 1.08);
 
+// Reusable immutable geometry for 3D flying animated cards (exact match with table cards)
+const sharedFlyingCardGeo = new THREE.BoxGeometry(1.15, 0.02, 1.75);
+
+// Flying card animation descriptor (ultra-low computational overhead)
+interface FlyingCard {
+  id: string;
+  type: 'play' | 'draw';
+  mesh: THREE.Mesh;
+  startPos: { x: number; y: number; z: number };
+  endPos: { x: number; y: number; z: number };
+  startRot: { x: number; y: number; z: number };
+  endRot: { x: number; y: number; z: number };
+  peakHeight: number;
+  startTime: number;
+  duration: number;
+  started: boolean;
+  onComplete?: () => void;
+}
+
+// Table & hand spatial anchors
+const DISCARD_PILE_POS = { x: 0.85, y: 0.055, z: 0 };
+const DRAW_PILE_POS = { x: -0.85, y: 0.22, z: 0 };
+const LOCAL_HAND_POS = { x: 0, y: 0.45, z: 4.3 };
+const LOCAL_HAND_ROT = { x: 0.35, y: 0, z: 0 };
+const DRAW_PILE_ROT = { x: 0, y: 0, z: 0 };
+
+function safeDisposeMaterial(mat: THREE.Material | THREE.Material[]) {
+  if (Array.isArray(mat)) {
+    mat.forEach(m => m.dispose());
+  } else {
+    mat.dispose();
+  }
+}
+
 // Rebuild or update the fan of cards held in hands
 function rebuildCardFan(fanGroup: THREE.Group, cardCount: number, cardBackMat: THREE.Material, isMobile: boolean = false) {
   while (fanGroup.children.length > 0) {
@@ -705,6 +740,11 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
   const drawPileGroupRef = useRef<THREE.Group | null>(null);
   const playersGroupRef = useRef<THREE.Group | null>(null);
   const [sceneReady, setSceneReady] = React.useState(false);
+
+  // Active flying 3D animated cards queue
+  const flyingCardsRef = useRef<FlyingCard[]>([]);
+  const prevGameStateRef = useRef<GameState | null>(null);
+  const discardImpactScale = useRef<number>(1.0);
 
   // Persistent look angles across state updates: playerId -> { targetYaw, targetPitch, currentYaw, currentPitch }
   const persistentLookAngles = useRef<
@@ -1199,6 +1239,59 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
         tablePointLight.intensity = 0.5 + Math.sin(time * 2) * 0.15;
       }
 
+      // Update in-flight 3D card animations with zero allocation
+      const nowMs = performance.now();
+      for (let i = flyingCardsRef.current.length - 1; i >= 0; i--) {
+        const fc = flyingCardsRef.current[i];
+        if (nowMs < fc.startTime) {
+          continue;
+        }
+        if (!fc.started) {
+          fc.started = true;
+          fc.mesh.visible = true;
+        }
+        const elapsed = nowMs - fc.startTime;
+        const progress = Math.min(1, elapsed / fc.duration);
+        // Smooth cubic ease-out
+        const easeT = 1 - Math.pow(1 - progress, 3);
+
+        const inv = 1 - easeT;
+        const c0 = inv * inv;
+        const c1 = 2 * inv * easeT;
+        const c2 = easeT * easeT;
+
+        const midX = (fc.startPos.x + fc.endPos.x) * 0.5;
+        const midY = Math.max(fc.startPos.y, fc.endPos.y) + fc.peakHeight;
+        const midZ = (fc.startPos.z + fc.endPos.z) * 0.5;
+
+        fc.mesh.position.x = c0 * fc.startPos.x + c1 * midX + c2 * fc.endPos.x;
+        fc.mesh.position.y = c0 * fc.startPos.y + c1 * midY + c2 * fc.endPos.y;
+        fc.mesh.position.z = c0 * fc.startPos.z + c1 * midZ + c2 * fc.endPos.z;
+
+        fc.mesh.rotation.x = fc.startRot.x + (fc.endRot.x - fc.startRot.x) * easeT;
+        fc.mesh.rotation.y = fc.startRot.y + (fc.endRot.y - fc.startRot.y) * easeT;
+        fc.mesh.rotation.z = fc.startRot.z + (fc.endRot.z - fc.startRot.z) * easeT;
+
+        if (progress >= 1) {
+          if (fc.onComplete) fc.onComplete();
+          scene.remove(fc.mesh);
+          safeDisposeMaterial(fc.mesh.material);
+          flyingCardsRef.current.splice(i, 1);
+        }
+      }
+
+      // Smooth discard pile impact bounce decay
+      if (discardImpactScale.current > 1.0) {
+        discardImpactScale.current = Math.max(1.0, discardImpactScale.current - 0.02);
+        if (discardCardMeshRef.current) {
+          discardCardMeshRef.current.scale.set(
+            discardImpactScale.current,
+            discardImpactScale.current,
+            discardImpactScale.current
+          );
+        }
+      }
+
       renderer.render(scene, camera);
     };
     animate();
@@ -1207,6 +1300,12 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       setSceneReady(false);
       activeRigsMap.current.clear();
       opponentsLookMap.current.clear();
+      // Clean up in-flight card animations
+      flyingCardsRef.current.forEach(fc => {
+        scene.remove(fc.mesh);
+        safeDisposeMaterial(fc.mesh.material);
+      });
+      flyingCardsRef.current = [];
       playersGroupRef.current = null;
       drawPileGroupRef.current = null;
       cancelAnimationFrame(animId);
@@ -1243,14 +1342,205 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     );
   }
 
-  // Update Top Card texture when state changes
+  // Coordinate 3D Flying Card Animations on card play and card draw
   useEffect(() => {
-    if (discardCardMeshRef.current && gameState.topCard) {
-      const tex = createCardTexture(gameState.topCard);
-      (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).map = tex;
-      (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
+    if (!sceneReady || !gameState) return;
+
+    const prev = prevGameStateRef.current;
+    prevGameStateRef.current = gameState;
+
+    // Initial load, rematch reset, or non-active match: sync top card immediately without animation
+    if (!prev || prev.status !== 'playing' || gameState.status !== 'playing') {
+      if (discardCardMeshRef.current && gameState.topCard) {
+        const tex = createCardTexture(gameState.topCard);
+        (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).map = tex;
+        (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      }
+      if (gameState.status !== 'playing') {
+        // Clean up any remaining flying cards
+        flyingCardsRef.current.forEach(fc => {
+          if (sceneRef.current) sceneRef.current.remove(fc.mesh);
+          safeDisposeMaterial(fc.mesh.material);
+        });
+        flyingCardsRef.current = [];
+      }
+      return;
     }
-  }, [gameState.topCard]);
+
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const isMobile = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
+    const cardBackTex = createCardTexture(null, true);
+
+    const spawnCard = (options: {
+      type: 'play' | 'draw';
+      texture: THREE.CanvasTexture;
+      startPos: { x: number; y: number; z: number };
+      endPos: { x: number; y: number; z: number };
+      startRot: { x: number; y: number; z: number };
+      endRot: { x: number; y: number; z: number };
+      peakHeight: number;
+      duration?: number;
+      delay?: number;
+      onComplete?: () => void;
+    }) => {
+      const delay = options.delay || 0;
+      const duration = options.duration || 450;
+      const mat = new THREE.MeshStandardMaterial({
+        map: options.texture,
+        roughness: 0.3,
+      });
+      const mesh = new THREE.Mesh(sharedFlyingCardGeo, mat);
+      mesh.castShadow = !isMobile;
+      mesh.receiveShadow = false;
+      mesh.position.set(options.startPos.x, options.startPos.y, options.startPos.z);
+      mesh.rotation.set(options.startRot.x, options.startRot.y, options.startRot.z);
+      mesh.visible = delay === 0;
+
+      scene.add(mesh);
+
+      flyingCardsRef.current.push({
+        id: Math.random().toString(36).substring(2, 9),
+        type: options.type,
+        mesh,
+        startPos: options.startPos,
+        endPos: options.endPos,
+        startRot: options.startRot,
+        endRot: options.endRot,
+        peakHeight: options.peakHeight,
+        startTime: performance.now() + delay,
+        duration,
+        started: delay === 0,
+        onComplete: options.onComplete,
+      });
+    };
+
+    // 1. CARD PLAY ANIMATION
+    const cardPlayed = prev.topCard && gameState.topCard && prev.topCard.id !== gameState.topCard.id;
+    let drawStartDelay = 0;
+
+    if (cardPlayed) {
+      const playedById = gameState.lastPlayedBy || prev.currentTurnPlayerId;
+      const isMe = (myPlayerId && playedById === myPlayerId) || (myUserId && playedById === myUserId);
+
+      let startPos = { ...LOCAL_HAND_POS };
+      let startRot = { ...LOCAL_HAND_ROT };
+
+      if (!isMe) {
+        const rig = activeRigsMap.current.get(playedById) ||
+          activeRigsMap.current.get(resolveUserKey(playedById)) ||
+          (playedById ? activeRigsMap.current.get(playedById) : null);
+
+        if (rig && rig.fanGroup) {
+          const worldPos = new THREE.Vector3();
+          rig.fanGroup.getWorldPosition(worldPos);
+          startPos = { x: worldPos.x, y: worldPos.y + 0.15, z: worldPos.z };
+          startRot = { x: 0.2, y: rig.group.rotation.y, z: 0 };
+        } else {
+          // Fallback based on player index around table
+          const pIndex = gameState.players.findIndex(p => p.id === playedById);
+          if (pIndex !== -1) {
+            const angle = (pIndex / gameState.players.length) * Math.PI * 2 + Math.PI / 2;
+            startPos = { x: Math.cos(angle) * 4.8, y: 0.65, z: Math.sin(angle) * 4.8 };
+            startRot = { x: 0.2, y: -angle - Math.PI / 2, z: 0 };
+          }
+        }
+      }
+
+      const targetRotY = -Math.PI / 12 + (Math.random() - 0.5) * 0.18;
+      const endPos = { ...DISCARD_PILE_POS };
+      const endRot = { x: 0, y: targetRotY, z: 0 };
+      const topTex = createCardTexture(gameState.topCard);
+
+      // Snap & clean up any previous in-flight play animations
+      for (let i = flyingCardsRef.current.length - 1; i >= 0; i--) {
+        if (flyingCardsRef.current[i].type === 'play') {
+          const fc = flyingCardsRef.current[i];
+          if (fc.onComplete) fc.onComplete();
+          scene.remove(fc.mesh);
+          safeDisposeMaterial(fc.mesh.material);
+          flyingCardsRef.current.splice(i, 1);
+        }
+      }
+
+      spawnCard({
+        type: 'play',
+        texture: topTex,
+        startPos,
+        endPos,
+        startRot,
+        endRot,
+        peakHeight: isMe ? 0.95 : 1.25,
+        duration: 440,
+        onComplete: () => {
+          if (discardCardMeshRef.current) {
+            (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).map = topTex;
+            (discardCardMeshRef.current.material as THREE.MeshStandardMaterial).needsUpdate = true;
+            discardCardMeshRef.current.rotation.y = targetRotY;
+            discardImpactScale.current = 1.12;
+          }
+          if (!isMe) {
+            sounds.playCard();
+          }
+        },
+      });
+
+      // If cards are drawn as a result of this play (Draw 2 / Wild 4), delay draw slightly so card lands first
+      drawStartDelay = 220;
+    }
+
+    // 2. CARD DRAW ANIMATION
+    gameState.players.forEach(player => {
+      const prevP = prev.players.find(p => p.id === player.id || (p.userId && p.userId === player.userId));
+      if (!prevP) return;
+
+      const diff = player.cardCount - prevP.cardCount;
+      if (diff > 0) {
+        const isMe = (myPlayerId && player.id === myPlayerId) || (myUserId && player.userId === myUserId);
+        const countToAnimate = Math.min(diff, 6); // Up to 6 flying cards for stacked penalties
+
+        let targetPos = { ...LOCAL_HAND_POS };
+        let targetRot = { ...LOCAL_HAND_ROT };
+
+        const rig = activeRigsMap.current.get(player.id) ||
+          activeRigsMap.current.get(resolveUserKey(player.id)) ||
+          (player.userId ? activeRigsMap.current.get(player.userId) : null);
+
+        if (!isMe && rig && rig.fanGroup) {
+          const worldPos = new THREE.Vector3();
+          rig.fanGroup.getWorldPosition(worldPos);
+          targetPos = { x: worldPos.x, y: worldPos.y + 0.15, z: worldPos.z };
+          targetRot = { x: 0.2, y: rig.group.rotation.y, z: 0 };
+        }
+
+        for (let c = 0; c < countToAnimate; c++) {
+          const isLast = c === countToAnimate - 1;
+          spawnCard({
+            type: 'draw',
+            texture: cardBackTex,
+            startPos: { ...DRAW_PILE_POS, y: DRAW_PILE_POS.y + c * 0.01 },
+            endPos: targetPos,
+            startRot: { ...DRAW_PILE_ROT },
+            endRot: targetRot,
+            peakHeight: isMe ? 1.05 : 1.3,
+            duration: 440,
+            delay: drawStartDelay + c * 110,
+            onComplete: () => {
+              if (!isMe && sounds.playDraw) {
+                sounds.playDraw();
+              }
+              if (isLast && !isMe && rig && cardBackMatRef.current) {
+                rebuildCardFan(rig.fanGroup, player.cardCount, cardBackMatRef.current, isMobile);
+                rig.cardCount = player.cardCount;
+              }
+            },
+          });
+        }
+      }
+    });
+
+  }, [gameState, sceneReady, myPlayerId, myUserId]);
 
   // Update Draw Pile 3D stack thickness when deck count changes
   useEffect(() => {
@@ -1348,8 +1638,15 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
 
         // Update card fan if card count changed
         if (existingRig.cardCount !== player.cardCount) {
-          rebuildCardFan(existingRig.fanGroup, player.cardCount, cardBackMat, isMobile);
-          existingRig.cardCount = player.cardCount;
+          if (player.cardCount < existingRig.cardCount) {
+            // Card was played: remove from fan immediately as it flies to table
+            rebuildCardFan(existingRig.fanGroup, player.cardCount, cardBackMat, isMobile);
+            existingRig.cardCount = player.cardCount;
+          } else if (!prevGameStateRef.current || prevGameStateRef.current.status !== 'playing') {
+            // Initial load or idle match: update fan immediately
+            rebuildCardFan(existingRig.fanGroup, player.cardCount, cardBackMat, isMobile);
+            existingRig.cardCount = player.cardCount;
+          }
         }
 
         // Update turn glow halo, LED status rings, and badge texture

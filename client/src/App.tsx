@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api, AuthUser } from './services/api';
 import { socket, connectSocket, disconnectSocket } from './services/socket';
 import { Room, PublicRoomInfo, GameState, ChatMessage, CardColor } from './types';
@@ -19,10 +19,46 @@ export const App: React.FC = () => {
   const [publicRooms, setPublicRooms] = useState<PublicRoomInfo[]>([]);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const savedRoomId = localStorage.getItem('uno_active_room_id');
+      if (savedRoomId) {
+        const cached = localStorage.getItem(`uno_chat_${savedRoomId}`);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.error('Failed to load cached chat messages:', e);
+    }
+    return [];
+  });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [handVisible, setHandVisible] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const isChatOpenRef = useRef(isChatOpen);
+  isChatOpenRef.current = isChatOpen;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  // Persist chat messages to localStorage per room
+  useEffect(() => {
+    const roomId = currentRoom?.id || localStorage.getItem('uno_active_room_id');
+    if (roomId && chatMessages.length > 0) {
+      try {
+        localStorage.setItem(`uno_chat_${roomId}`, JSON.stringify(chatMessages.slice(-100)));
+      } catch (e) {
+        console.error('Failed to persist chat messages:', e);
+      }
+    }
+  }, [chatMessages, currentRoom?.id]);
+
+  // Clear unread badge when chat is opened
+  useEffect(() => {
+    if (isChatOpen) {
+      setUnreadChatCount(0);
+    }
+  }, [isChatOpen]);
 
   // Check saved login session on mount
   useEffect(() => {
@@ -72,12 +108,36 @@ export const App: React.FC = () => {
       localStorage.setItem('uno_active_room_id', roomId);
     });
 
-    socket.on('room:reconnected', ({ roomId, room }: { roomId: string; room: Room }) => {
+    socket.on('room:reconnected', ({ roomId, room, messages }: { roomId: string; room: Room; messages?: ChatMessage[] }) => {
       localStorage.setItem('uno_active_room_id', roomId);
       setCurrentRoom(room);
+      const serverMsgs = messages || room.messages;
+      if (serverMsgs && serverMsgs.length > 0) {
+        setChatMessages(prev => {
+          const map = new Map<string, ChatMessage>();
+          prev.forEach(m => map.set(m.id, m));
+          serverMsgs.forEach(m => map.set(m.id, m));
+          return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+        });
+      }
+    });
+
+    socket.on('chat:history', ({ messages }: { messages: ChatMessage[] }) => {
+      if (messages && Array.isArray(messages) && messages.length > 0) {
+        setChatMessages(prev => {
+          const map = new Map<string, ChatMessage>();
+          prev.forEach(m => map.set(m.id, m));
+          messages.forEach(m => map.set(m.id, m));
+          return Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+        });
+      }
     });
 
     socket.on('room:reconnect_failed', () => {
+      const savedRoomId = localStorage.getItem('uno_active_room_id');
+      if (savedRoomId) {
+        localStorage.removeItem(`uno_chat_${savedRoomId}`);
+      }
       localStorage.removeItem('uno_active_room_id');
     });
 
@@ -86,9 +146,15 @@ export const App: React.FC = () => {
     });
 
     socket.on('room:left', () => {
+      const savedRoomId = localStorage.getItem('uno_active_room_id');
+      if (savedRoomId) {
+        localStorage.removeItem(`uno_chat_${savedRoomId}`);
+      }
       localStorage.removeItem('uno_active_room_id');
       setCurrentRoom(null);
       setGameState(null);
+      setChatMessages([]);
+      setUnreadChatCount(0);
     });
 
     socket.on('room:error', ({ message }: { message: string }) => {
@@ -134,6 +200,10 @@ export const App: React.FC = () => {
 
     socket.on('chat:message', (msg: ChatMessage) => {
       setChatMessages(prev => [...prev, msg]);
+      // Only increment unread counter if chat is closed and sender is not current user
+      if (!isChatOpenRef.current && msg.senderId !== currentUserRef.current?.id) {
+        setUnreadChatCount(prev => prev + 1);
+      }
     });
 
     return () => {
@@ -152,6 +222,7 @@ export const App: React.FC = () => {
       socket.off('game:error');
       socket.off('game:game_over');
       socket.off('chat:message');
+      socket.off('chat:history');
     };
   }, [currentUser]);
 
@@ -197,21 +268,41 @@ export const App: React.FC = () => {
   };
 
   const handleLeaveRoom = () => {
+    const roomId = currentRoom?.id || localStorage.getItem('uno_active_room_id');
+    if (roomId) {
+      localStorage.removeItem(`uno_chat_${roomId}`);
+    }
     voiceChat.disableVoice();
     socket.emit('room:leave');
     localStorage.removeItem('uno_active_room_id');
     setCurrentRoom(null);
     setGameState(null);
     setChatMessages([]);
+    setUnreadChatCount(0);
   };
 
   const handleQuitMatch = () => {
+    const roomId = currentRoom?.id || localStorage.getItem('uno_active_room_id');
+    if (roomId) {
+      localStorage.removeItem(`uno_chat_${roomId}`);
+    }
     voiceChat.disableVoice();
     socket.emit('room:quit');
     localStorage.removeItem('uno_active_room_id');
     setCurrentRoom(null);
     setGameState(null);
     setChatMessages([]);
+    setUnreadChatCount(0);
+  };
+
+  const handleToggleChat = () => {
+    setIsChatOpen(prev => {
+      const next = !prev;
+      if (next) {
+        setUnreadChatCount(0);
+      }
+      return next;
+    });
   };
 
   const handlePlayCard = (cardId: string, chosenColor?: CardColor) => {
@@ -302,10 +393,11 @@ export const App: React.FC = () => {
             direction={gameState.direction}
             lastActionMessage={gameState.lastActionMessage}
             hasDrawnThisTurn={gameState.hasDrawnThisTurn || false}
+            pendingDrawCount={gameState.pendingDrawCount || 0}
             onQuitGame={handleQuitMatch}
             isChatOpen={isChatOpen}
-            onToggleChat={() => setIsChatOpen(!isChatOpen)}
-            chatMessageCount={chatMessages.length}
+            onToggleChat={handleToggleChat}
+            unreadChatCount={unreadChatCount}
           />
 
           {/* Player's Hand Tray (Playable cards highlighted, collapsible) */}
@@ -316,6 +408,7 @@ export const App: React.FC = () => {
             topCard={gameState.topCard}
             onPlayCard={handlePlayCard}
             visible={handVisible}
+            pendingDrawCount={gameState.pendingDrawCount || 0}
           />
 
           {/* Game Over Modal when a player wins */}
@@ -339,7 +432,8 @@ export const App: React.FC = () => {
           messages={chatMessages}
           onSendMessage={handleSendMessage}
           isOpen={isChatOpen}
-          onToggle={() => setIsChatOpen(!isChatOpen)}
+          onToggle={handleToggleChat}
+          unreadCount={unreadChatCount}
           showTriggerButton={!gameState || gameState.status === 'waiting'}
         />
       )}

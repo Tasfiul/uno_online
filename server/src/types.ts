@@ -41,6 +41,7 @@ export interface GameState {
   lastActionMessage?: string;
   turnStartTime?: number;
   hasDrawnThisTurn?: boolean;
+  pendingDrawCount?: number;
 }
 
 export interface Room {
@@ -54,6 +55,7 @@ export interface Room {
   status: GameStatus;
   maxPlayers: number;
   createdAt: number;
+  messages?: ChatMessage[];
 }
 
 export interface PublicRoomInfo {

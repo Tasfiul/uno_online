@@ -58,6 +58,11 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
     }
   }
 
+  function broadcastChatMessage(roomId: string, message: ChatMessage) {
+    roomManager.addMessage(roomId, message);
+    io.to(roomId).emit('chat:message', message);
+  }
+
   io.on('connection', (socket: Socket) => {
     // 1. Initial Room Listing
     socket.on('rooms:list', () => {
@@ -79,7 +84,12 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         socketPlayerMap.set(socket.id, result.player);
         socket.join(roomId);
 
-        socket.emit('room:reconnected', { roomId, room: result.room });
+        socket.emit('room:reconnected', { 
+          roomId, 
+          room: result.room,
+          messages: roomManager.getMessages(roomId),
+        });
+        socket.emit('chat:history', { messages: roomManager.getMessages(roomId) });
         broadcastRoomUpdate(roomId);
 
         // Sync look angles in roomPlayerLooks on reconnect
@@ -110,7 +120,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
           timestamp: Date.now(),
           isSystem: true,
         };
-        io.to(roomId).emit('chat:message', sysMsg);
+        broadcastChatMessage(roomId, sysMsg);
       } else {
         // Room no longer exists or player not in it
         socket.emit('room:reconnect_failed');
@@ -193,6 +203,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       socket.join(result.room.id);
 
       socket.emit('room:joined', { roomId: result.room.id });
+      socket.emit('chat:history', { messages: roomManager.getMessages(result.room.id) });
       broadcastRoomUpdate(result.room.id);
 
       const sysMsg: ChatMessage = {
@@ -204,7 +215,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         timestamp: Date.now(),
         isSystem: true,
       };
-      io.to(result.room.id).emit('chat:message', sysMsg);
+      broadcastChatMessage(result.room.id, sysMsg);
       io.emit('rooms:list_response', roomManager.getPublicRooms());
     });
 
@@ -242,6 +253,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       socket.join(result.room.id);
 
       socket.emit('room:joined', { roomId: result.room.id });
+      socket.emit('chat:history', { messages: roomManager.getMessages(result.room.id) });
       broadcastRoomUpdate(result.room.id);
 
       const sysMsg: ChatMessage = {
@@ -253,7 +265,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         timestamp: Date.now(),
         isSystem: true,
       };
-      io.to(result.room.id).emit('chat:message', sysMsg);
+      broadcastChatMessage(result.room.id, sysMsg);
     });
 
     // 6. Start Game
@@ -279,7 +291,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         timestamp: Date.now(),
         isSystem: true,
       };
-      io.to(roomId).emit('chat:message', sysMsg);
+      broadcastChatMessage(roomId, sysMsg);
       io.emit('rooms:list_response', roomManager.getPublicRooms());
     });
 
@@ -393,7 +405,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
           timestamp: Date.now(),
           isSystem: true,
         };
-        io.to(roomId).emit('chat:message', sysMsg);
+        broadcastChatMessage(roomId, sysMsg);
         broadcastGameState(roomId);
       } else {
         socket.emit('game:check_called', checkResult);
@@ -416,7 +428,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         timestamp: Date.now(),
       };
 
-      io.to(roomId).emit('chat:message', message);
+      broadcastChatMessage(roomId, message);
     });
 
     // 13. Live WebRTC Voice Chat Signaling
@@ -603,7 +615,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
             timestamp: Date.now(),
             isSystem: true,
           };
-          io.to(roomId).emit('chat:message', sysMsg);
+          broadcastChatMessage(roomId, sysMsg);
           broadcastRoomUpdate(roomId);
           broadcastGameState(roomId);
 
@@ -658,7 +670,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
           timestamp: Date.now(),
           isSystem: true,
         };
-        io.to(roomId).emit('chat:message', sysMsg);
+        broadcastChatMessage(roomId, sysMsg);
         broadcastRoomUpdate(roomId);
 
         // Always broadcast game state to remaining players

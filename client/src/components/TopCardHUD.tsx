@@ -1,6 +1,6 @@
 import React from 'react';
 import { UnoCard, CardColor } from '../types';
-import { Eye, EyeOff, Sparkles, RefreshCw, SkipForward, LogOut, MessageSquare } from 'lucide-react';
+import { Eye, EyeOff, Sparkles, RefreshCw, SkipForward, LogOut, MessageSquare, Zap } from 'lucide-react';
 import { sounds } from '../services/audio';
 import { VoiceChatBar } from './VoiceChatBar';
 
@@ -19,10 +19,11 @@ interface TopCardHUDProps {
   direction: 1 | -1;
   lastActionMessage?: string;
   hasDrawnThisTurn?: boolean;
+  pendingDrawCount?: number;
   onQuitGame?: () => void;
   isChatOpen: boolean;
   onToggleChat: () => void;
-  chatMessageCount: number;
+  unreadChatCount?: number;
 }
 
 const COLOR_MAP: Record<CardColor, { bg: string; text: string; ring: string; label: string; ovalText: string }> = {
@@ -48,10 +49,11 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
   direction,
   lastActionMessage,
   hasDrawnThisTurn,
+  pendingDrawCount,
   onQuitGame,
   isChatOpen,
   onToggleChat,
-  chatMessageCount,
+  unreadChatCount = 0,
 }) => {
   const [showQuitModal, setShowQuitModal] = React.useState(false);
 
@@ -115,9 +117,9 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
               {/* Top Card Widget */}
               <div className="flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-lg sm:rounded-2xl glass-panel shadow-lg border border-white/10">
                 <div
-                  className={`w-7 h-10 sm:w-11 sm:h-16 rounded sm:rounded-lg flex items-center justify-center border sm:border-2 border-white shadow-md relative overflow-hidden shrink-0 ${
-                    cardColorInfo.bg
-                  }`}
+                  key={topCard.id}
+                  className={`w-7 h-10 sm:w-11 sm:h-16 rounded sm:rounded-lg flex items-center justify-center border sm:border-2 border-white shadow-md relative overflow-hidden shrink-0 transition-transform duration-300 animate-in zoom-in-75 ${cardColorInfo.bg
+                    }`}
                 >
                   {/* Solid White Center Oval */}
                   <div className="w-[84%] h-[80%] rounded-[6px] sm:rounded-[10px] bg-white flex items-center justify-center shadow-inner transform -rotate-12 border border-slate-200">
@@ -145,6 +147,14 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                     {direction === 1 ? '↻ CW' : '↺ CCW'}
                   </span>
                 </div>
+
+                {/* Active Penalty Stack Badge */}
+                {pendingDrawCount && pendingDrawCount > 0 ? (
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-red-600 to-amber-600 text-white font-black text-[9px] sm:text-[10px] border border-amber-300 shadow-[0_0_12px_rgba(239,68,68,0.8)] animate-pulse shrink-0">
+                    <Zap className="w-2.5 h-2.5 text-yellow-300 fill-yellow-300" />
+                    <span>+{pendingDrawCount}</span>
+                  </div>
+                ) : null}
               </div>
 
               {/* Voice Chat Button */}
@@ -158,7 +168,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 setShowQuitModal(true);
               }}
               title="Quit Match and return to Lobby"
-              className="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 hover:border-red-400 text-red-300 hover:text-red-200 font-bold text-[10px] sm:text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-b from-slate-800 to-slate-900 hover:from-red-950 hover:to-red-900 border-2 border-slate-700 hover:border-red-600/70 border-b-[3px] sm:border-b-4 border-b-slate-950 text-red-300 hover:text-red-100 font-bold text-[10px] sm:text-xs shadow-md flex items-center gap-1.5 transition-all active:translate-y-[2px] active:border-b-2 whitespace-nowrap cursor-pointer select-none"
             >
               <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
               <span>Quit</span>
@@ -174,7 +184,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onCallCheck();
               }}
               title="Call Check if someone with 1 card forgot to call UNO"
-              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 hover:border-cyan-300 text-cyan-200 hover:text-white font-black text-[11px] sm:text-xs shadow-[0_0_12px_rgba(6,182,212,0.25)] transition-all active:scale-95 tracking-wide whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-b from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 active:from-cyan-500 active:to-cyan-600 border-2 border-cyan-200 border-b-[3px] sm:border-b-4 border-b-cyan-800 text-slate-950 font-black text-[11px] sm:text-xs shadow-md active:translate-y-[2px] active:border-b-2 transition-all tracking-wide whitespace-nowrap cursor-pointer select-none"
             >
               <span>CHECK</span>
             </button>
@@ -186,7 +196,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onCallUno();
               }}
               title="Call UNO"
-              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 hover:border-amber-400 text-amber-300 hover:text-amber-200 font-black text-[11px] sm:text-xs shadow-md transition-all active:scale-95 tracking-wide whitespace-nowrap"
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 hover:from-amber-200 hover:to-amber-400 active:from-amber-500 active:to-amber-600 border-2 border-amber-200 border-b-[3px] sm:border-b-4 border-b-amber-800 text-slate-950 font-black text-[11px] sm:text-xs shadow-md active:translate-y-[2px] active:border-b-2 transition-all tracking-wide whitespace-nowrap cursor-pointer select-none"
             >
               <span>CALL UNO</span>
             </button>
@@ -198,12 +208,15 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                 onToggleChat();
               }}
               title="Toggle Live Chat"
-              className="p-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl glass-panel hover:bg-slate-800 border border-white/10 hover:border-white/25 text-slate-300 hover:text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95"
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-b from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 active:from-slate-800 active:to-slate-900 border-2 border-slate-500 border-b-[3px] sm:border-b-4 border-b-slate-950 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all active:translate-y-[2px] active:border-b-2 whitespace-nowrap cursor-pointer select-none"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
+              <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
               <span className="hidden sm:inline text-xs">Chat</span>
-              {chatMessageCount > 0 && !isChatOpen && (
-                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 animate-ping" />
+              {unreadChatCount > 0 && !isChatOpen && (
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.9)]" />
+                </span>
               )}
             </button>
           </div>
@@ -212,21 +225,34 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
         {/* Tier 2: Centered Turn Alert Banner & Action Message */}
         <div className="pointer-events-auto flex flex-col items-center justify-center w-full">
           <div
-            className={`px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-full border-2 shadow-xl transition-all flex items-center gap-2 ${
-              isMyTurn
-                ? 'bg-amber-400 border-amber-300 text-black font-black'
+            className={`px-3.5 py-1.5 sm:px-5 sm:py-2 rounded-full border-2 shadow-xl transition-all flex items-center gap-2 ${isMyTurn
+                ? pendingDrawCount && pendingDrawCount > 0
+                  ? 'bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 border-yellow-300 text-white font-black shadow-[0_0_24px_rgba(239,68,68,0.7)] animate-pulse'
+                  : 'bg-amber-400 border-amber-300 text-black font-black'
                 : 'bg-slate-900 border-slate-700 text-white font-bold text-xs sm:text-sm'
-            }`}
+              }`}
           >
             {isMyTurn ? (
-              <>
+              pendingDrawCount && pendingDrawCount > 0 ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm tracking-wide font-black">
+                    PENALTY STACK: +{pendingDrawCount}!
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-black text-red-950 bg-yellow-300 px-2 py-0.5 rounded-full shadow">
+                    Stack or Draw
+                  </span>
+                </div>
+              ) : (
                 <span className="text-xs sm:text-sm tracking-wide font-black">IT'S YOUR TURN!</span>
-              </>
+              )
             ) : (
               <>
                 <div className="w-2.5 h-2.5 rounded-full bg-blue-400" />
                 <span className="text-xs sm:text-sm text-slate-200">
                   <span className="text-white font-black">{currentTurnPlayerName}</span>'s turn
+                  {pendingDrawCount && pendingDrawCount > 0 ? (
+                    <span className="ml-1.5 text-amber-300 font-black animate-pulse">(Facing +{pendingDrawCount} stack)</span>
+                  ) : null}
                 </span>
               </>
             )}
@@ -284,9 +310,8 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
 
       {/* Floating Center Controls (Positioned cleanly above the cards) */}
       <div
-        className={`pointer-events-auto flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 ${
-          handVisible ? 'mb-32 sm:mb-40 md:mb-48' : 'mb-3 sm:mb-4'
-        }`}
+        className={`pointer-events-auto flex items-center justify-center gap-2 sm:gap-3 transition-all duration-300 ${handVisible ? 'mb-32 sm:mb-40 md:mb-48' : 'mb-3 sm:mb-4'
+          }`}
       >
         {/* TAKE CARD OR PASS BUTTON */}
         {hasDrawnThisTurn && isMyTurn ? (
@@ -300,6 +325,21 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
             <SkipForward className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             <span>PASS TURN</span>
           </button>
+        ) : pendingDrawCount && pendingDrawCount > 0 ? (
+          <button
+            onClick={() => {
+              sounds.playDraw();
+              onDrawCard();
+            }}
+            disabled={!isMyTurn}
+            className={`px-3.5 py-2 sm:px-6 sm:py-2.5 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-2xl transition-all transform active:scale-95 border whitespace-nowrap ${isMyTurn
+                ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white border-yellow-300 shadow-[0_0_24px_rgba(239,68,68,0.7)] scale-105 animate-pulse'
+                : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
+              }`}
+          >
+            <Zap className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isMyTurn ? 'text-yellow-200 fill-yellow-200' : 'text-slate-500'}`} />
+            <span>DRAW +{pendingDrawCount} CARDS</span>
+          </button>
         ) : (
           <button
             onClick={() => {
@@ -307,11 +347,10 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
               onDrawCard();
             }}
             disabled={!isMyTurn}
-            className={`px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-2xl transition-all transform active:scale-95 border whitespace-nowrap ${
-              isMyTurn
+            className={`px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-2xl transition-all transform active:scale-95 border whitespace-nowrap ${isMyTurn
                 ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white border-blue-400 shadow-blue-500/30 scale-105'
                 : 'bg-slate-800/80 border-slate-700 text-slate-500 cursor-not-allowed opacity-60'
-            }`}
+              }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isMyTurn ? 'animate-spin-slow text-yellow-300' : ''}`} />
             <span>TAKE A CARD</span>
@@ -324,7 +363,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
             sounds.playClick();
             onToggleHand();
           }}
-          className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl glass-panel hover:bg-slate-800/90 border border-white/15 text-white font-medium text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-xl transition-all active:scale-95 whitespace-nowrap"
+          className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border-2 border-slate-600 border-b-4 border-b-slate-950 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-xl transition-all active:translate-y-[2px] active:border-b-2 whitespace-nowrap cursor-pointer select-none"
         >
           {handVisible ? (
             <>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UnoCard, CardColor } from '../types';
 import { sounds } from '../services/audio';
 
@@ -9,6 +9,7 @@ interface PlayerHandProps {
   topCard: UnoCard | null;
   onPlayCard: (cardId: string, chosenColor?: CardColor) => void;
   visible: boolean;
+  pendingDrawCount?: number;
 }
 
 interface ColorConfig {
@@ -58,8 +59,99 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   topCard,
   onPlayCard,
   visible,
+  pendingDrawCount,
 }) => {
   const [selectedWildCardId, setSelectedWildCardId] = useState<string | null>(null);
+  const [playingCardId, setPlayingCardId] = useState<string | null>(null);
+  // Store all card IDs that have been seen so they NEVER re-trigger drawn animation
+  const seenCardIdsRef = useRef<Set<string>>(new Set(cards.map(c => c.id)));
+  // Active newly drawn card IDs currently animating in
+  const [newlyDrawnIds, setNewlyDrawnIds] = useState<Set<string>>(new Set());
+  // Store timers per card ID so subsequent state updates do NOT cancel or corrupt animation completion
+  const drawTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const handleDrawnAnimationEnd = (cardId: string) => {
+    const timer = drawTimersRef.current.get(cardId);
+    if (timer) {
+      clearTimeout(timer);
+      drawTimersRef.current.delete(cardId);
+    }
+    setNewlyDrawnIds(prev => {
+      if (!prev.has(cardId)) return prev;
+      const next = new Set(prev);
+      next.delete(cardId);
+      return next;
+    });
+  };
+
+  // Track newly drawn cards to trigger fluid entry animation exactly once
+  useEffect(() => {
+    // Initial deal guard: if seenCardIdsRef was empty and cards arrive, silently record them
+    if (seenCardIdsRef.current.size === 0 && cards.length > 0) {
+      cards.forEach(card => seenCardIdsRef.current.add(card.id));
+      return;
+    }
+
+    const newlyAdded: string[] = [];
+    for (const card of cards) {
+      if (!seenCardIdsRef.current.has(card.id)) {
+        seenCardIdsRef.current.add(card.id);
+        newlyAdded.push(card.id);
+      }
+    }
+
+    if (newlyAdded.length > 0) {
+      setNewlyDrawnIds(prev => {
+        const next = new Set(prev);
+        newlyAdded.forEach(id => next.add(id));
+        return next;
+      });
+
+      newlyAdded.forEach((id, index) => {
+        const timer = setTimeout(() => {
+          handleDrawnAnimationEnd(id);
+        }, 500 + index * 110);
+        drawTimersRef.current.set(id, timer);
+      });
+    }
+
+    // Keep seenCardIdsRef pruned if cards leave hand (e.g. played cards)
+    const currentIdSet = new Set(cards.map(c => c.id));
+    for (const id of Array.from(seenCardIdsRef.current)) {
+      if (!currentIdSet.has(id)) {
+        seenCardIdsRef.current.delete(id);
+        const timer = drawTimersRef.current.get(id);
+        if (timer) {
+          clearTimeout(timer);
+          drawTimersRef.current.delete(id);
+        }
+        setNewlyDrawnIds(prev => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    }
+  }, [cards]);
+
+  // Clean up all pending timers on unmount
+  useEffect(() => {
+    return () => {
+      drawTimersRef.current.forEach(timer => clearTimeout(timer));
+      drawTimersRef.current.clear();
+    };
+  }, []);
+
+  // Safety timer to clear playingCardId if server action fails or resets
+  useEffect(() => {
+    if (playingCardId) {
+      const timer = setTimeout(() => {
+        setPlayingCardId(null);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [playingCardId]);
 
   if (!visible) {
     return null;
@@ -70,6 +162,20 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
     // Rule: Match cannot be finished with a Power card (Skip, Reverse, Draw 2) or Wild card (Wild, Wild 4)
     if (cards.length === 1 && card.type !== 'number') {
+      return false;
+    }
+
+    // House Rule: Draw Power Card Stacking (+2 and +4)
+    // If there is an active pending draw penalty on the table:
+    if (pendingDrawCount && pendingDrawCount > 0) {
+      // If top card is Draw 2: +2 can stack, and +4 can stack!
+      if (topCard.type === 'draw2') {
+        return card.type === 'draw2' || card.type === 'wild4';
+      }
+      // If top card is Wild Draw 4: only +4 can stack (+2 cannot stack on +4)
+      if (topCard.type === 'wild4') {
+        return card.type === 'wild4';
+      }
       return false;
     }
 
@@ -99,12 +205,14 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
       return;
     }
 
+    setPlayingCardId(card.id);
     sounds.playCard();
     onPlayCard(card.id);
   };
 
   const handleChooseColor = (color: CardColor) => {
     if (selectedWildCardId) {
+      setPlayingCardId(selectedWildCardId);
       sounds.playCard();
       onPlayCard(selectedWildCardId, color);
       setSelectedWildCardId(null);
@@ -238,21 +346,34 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               const playable = isCardPlayable(card);
               const colorInfo = COLOR_CLASSES[card.color] || COLOR_CLASSES.red;
               const cornerLabel = getCornerSymbol(card);
+              const isPlaying = playingCardId === card.id;
+              const isNewlyDrawn = newlyDrawnIds.has(card.id);
+              const drawnIndex = isNewlyDrawn ? Array.from(newlyDrawnIds).indexOf(card.id) : 0;
 
               return (
                 <div
                   key={card.id || idx}
                   onClick={() => handleCardClick(card)}
+                  onAnimationEnd={(e) => {
+                    if (e.target === e.currentTarget && isNewlyDrawn) {
+                      handleDrawnAnimationEnd(card.id);
+                    }
+                  }}
                   style={{
                     transformOrigin: 'bottom center',
-                    zIndex: idx,
+                    zIndex: isPlaying ? 90 : idx,
+                    animationDelay: isNewlyDrawn ? `${drawnIndex * 110}ms` : undefined,
                   }}
-                  className={`relative shrink-0 w-15 h-23 sm:w-19 sm:h-30 md:w-23 md:h-35 rounded-xl border-[2px] sm:border-[2.5px] cursor-pointer transition-all duration-200 select-none overflow-hidden opacity-100 ${
+                  className={`relative shrink-0 w-15 h-23 sm:w-19 sm:h-30 md:w-23 md:h-35 rounded-xl border-[2px] sm:border-[2.5px] cursor-pointer select-none overflow-hidden ${
                     colorInfo.bg
                   } shadow-[0_8px_20px_rgba(0,0,0,0.65)] ${
-                    playable
-                      ? `${colorInfo.border} ${colorInfo.glow} -translate-y-4 sm:-translate-y-5 hover:-translate-y-8 sm:hover:-translate-y-9 hover:scale-110 hover:z-50 ring-2 ring-white/90`
-                      : 'border-slate-800 brightness-[0.7] saturate-[0.85] translate-y-0 hover:-translate-y-1 cursor-not-allowed'
+                    isPlaying
+                      ? '-translate-y-28 sm:-translate-y-40 scale-75 -rotate-6 opacity-0 pointer-events-none transition-all duration-300 ease-out'
+                      : isNewlyDrawn
+                      ? `animate-card-drawn-in ${playable ? `${colorInfo.border} ${colorInfo.glow}` : 'border-slate-800'}`
+                      : playable
+                      ? `${colorInfo.border} ${colorInfo.glow} -translate-y-4 sm:-translate-y-5 hover:-translate-y-8 sm:hover:-translate-y-9 hover:scale-110 hover:z-50 ring-2 ring-white/90 transition-all duration-200`
+                      : 'border-slate-800 brightness-[0.7] saturate-[0.85] translate-y-0 hover:-translate-y-1 cursor-not-allowed transition-all duration-200'
                   }`}
                 >
                   {/* Solid Opaque Card Interior */}

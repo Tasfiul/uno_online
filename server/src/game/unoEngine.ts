@@ -56,6 +56,7 @@ export class UnoGameEngine {
       lastActionMessage: `Game started! Top card is ${initialTopCard.color.toUpperCase()} ${initialTopCard.value}`,
       turnStartTime: Date.now(),
       hasDrawnThisTurn: false,
+      pendingDrawCount: 0,
     };
 
     // Apply starting card effects if any
@@ -89,16 +90,28 @@ export class UnoGameEngine {
         this.state.lastActionMessage = `Initial Reverse card! Direction is counter-clockwise.`;
       }
     } else if (card.type === 'draw2') {
-      const firstPlayer = this.state.players[0];
-      this.giveCardsToPlayer(firstPlayer.id, 2);
-      this.advanceTurn(1);
-      this.state.lastActionMessage = `Initial Draw 2 card! ${firstPlayer.username} drew 2 cards and turn skipped.`;
+      this.state.pendingDrawCount = 2;
+      this.state.lastActionMessage = `Initial Draw 2 card! First player must stack or draw 2 cards.`;
     }
   }
 
   public canPlayCard(card: UnoCard, remainingCardCount?: number): boolean {
     // RULE: Cannot finish match with a Power card (Skip, Reverse, Draw 2) or Wild card (Wild, Wild 4)
     if (remainingCardCount === 1 && card.type !== 'number') {
+      return false;
+    }
+
+    // HOUSE RULE: Draw Power Card Stacking (+2 and +4)
+    // If there is an active pending draw penalty on the table:
+    if (this.state.pendingDrawCount && this.state.pendingDrawCount > 0) {
+      // If the top card is Draw 2: +2 can stack, and +4 can stack!
+      if (this.state.topCard.type === 'draw2') {
+        return card.type === 'draw2' || card.type === 'wild4';
+      }
+      // If the top card is Wild Draw 4: only +4 can stack (+2 cannot stack on +4)
+      if (this.state.topCard.type === 'wild4') {
+        return card.type === 'wild4';
+      }
       return false;
     }
 
@@ -186,9 +199,11 @@ export class UnoGameEngine {
     const numPlayers = this.state.players.length;
 
     if (card.type === 'skip') {
+      this.state.pendingDrawCount = 0;
       this.state.lastActionMessage = `${player.username} played Skip! Next player skipped.`;
       this.advanceTurn(2);
     } else if (card.type === 'reverse') {
+      this.state.pendingDrawCount = 0;
       if (numPlayers === 2) {
         this.state.lastActionMessage = `${player.username} played Reverse! Next player skipped.`;
         this.advanceTurn(2);
@@ -198,19 +213,33 @@ export class UnoGameEngine {
         this.advanceTurn(1);
       }
     } else if (card.type === 'draw2') {
-      const nextPlayer = this.getNextPlayer(1);
-      this.giveCardsToPlayer(nextPlayer.id, 2);
-      this.state.lastActionMessage = `${player.username} played Draw Two! ${nextPlayer.username} drew 2 cards and missed turn.`;
-      this.advanceTurn(2);
+      const prevPending = this.state.pendingDrawCount || 0;
+      const newPending = prevPending + 2;
+      this.state.pendingDrawCount = newPending;
+      this.advanceTurn(1);
+      const nextPlayer = this.state.players.find(p => p.id === this.state.currentTurnPlayerId);
+      if (prevPending > 0) {
+        this.state.lastActionMessage = `⚡ ${player.username} STACKED Draw Two! Penalty is now +${newPending} on ${nextPlayer?.username || 'next player'}!`;
+      } else {
+        this.state.lastActionMessage = `${player.username} played Draw Two! Stack is +2 on ${nextPlayer?.username || 'next player'}.`;
+      }
     } else if (card.type === 'wild4') {
-      const nextPlayer = this.getNextPlayer(1);
-      this.giveCardsToPlayer(nextPlayer.id, 4);
-      this.state.lastActionMessage = `${player.username} played Wild Draw 4! Color is ${chosenColor?.toUpperCase()}. ${nextPlayer.username} drew 4 cards and missed turn.`;
-      this.advanceTurn(2);
+      const prevPending = this.state.pendingDrawCount || 0;
+      const newPending = prevPending + 4;
+      this.state.pendingDrawCount = newPending;
+      this.advanceTurn(1);
+      const nextPlayer = this.state.players.find(p => p.id === this.state.currentTurnPlayerId);
+      if (prevPending > 0) {
+        this.state.lastActionMessage = `🔥 ${player.username} STACKED Wild Draw 4! Color is ${chosenColor?.toUpperCase()}. Penalty is now +${newPending} on ${nextPlayer?.username || 'next player'}!`;
+      } else {
+        this.state.lastActionMessage = `${player.username} played Wild Draw 4! Color is ${chosenColor?.toUpperCase()}. Stack is +4 on ${nextPlayer?.username || 'next player'}.`;
+      }
     } else if (card.type === 'wild') {
+      this.state.pendingDrawCount = 0;
       this.state.lastActionMessage = `${player.username} played Wild! New color is ${chosenColor?.toUpperCase()}.`;
       this.advanceTurn(1);
     } else {
+      this.state.pendingDrawCount = 0;
       this.state.lastActionMessage = `${player.username} played ${card.color.toUpperCase()} ${card.value}.`;
       this.advanceTurn(1);
     }
@@ -228,14 +257,26 @@ export class UnoGameEngine {
       return { success: false, error: 'Not your turn' };
     }
 
-    // Fix: Prevent drawing multiple times in the same turn
-    if (this.drawnThisTurn) {
-      return { success: false, error: 'You have already drawn a card this turn. Choose to play it or pass.' };
-    }
-
     const player = this.state.players.find(p => p.id === playerId);
     if (!player) {
       return { success: false, error: 'Player not found' };
+    }
+
+    // HOUSE RULE: If facing an active penalty stack: draw all accumulated cards and end turn immediately
+    if (this.state.pendingDrawCount && this.state.pendingDrawCount > 0) {
+      const penaltyCount = this.state.pendingDrawCount;
+      this.giveCardsToPlayer(player.id, penaltyCount);
+      this.state.pendingDrawCount = 0;
+      this.drawnThisTurn = false;
+      this.state.hasDrawnThisTurn = false;
+      this.state.lastActionMessage = `${player.username} drew ${penaltyCount} penalty cards from the stack!`;
+      this.advanceTurn(1);
+      return { success: true };
+    }
+
+    // Prevent drawing multiple times in the same normal turn
+    if (this.drawnThisTurn) {
+      return { success: false, error: 'You have already drawn a card this turn. Choose to play it or pass.' };
     }
 
     const card = this.drawFromPile();
@@ -253,7 +294,7 @@ export class UnoGameEngine {
 
     this.state.drawPileCount = this.drawPile.length;
 
-    // Player took a card: stays on their turn so they can either play or manually pass (no auto-pass)
+    // Player took a normal card: stays on their turn so they can either play or manually pass
     this.drawnThisTurn = true;
     this.state.hasDrawnThisTurn = true;
     this.state.lastActionMessage = `${player.username} took a card from the deck.`;
@@ -265,6 +306,9 @@ export class UnoGameEngine {
   public passTurn(playerId: string): { success: boolean; error?: string } {
     if (this.state.currentTurnPlayerId !== playerId) {
       return { success: false, error: 'Not your turn' };
+    }
+    if (this.state.pendingDrawCount && this.state.pendingDrawCount > 0) {
+      return { success: false, error: 'Must draw the penalty stack or play a stacking card' };
     }
     if (!this.drawnThisTurn) {
       return { success: false, error: 'Must draw before passing' };

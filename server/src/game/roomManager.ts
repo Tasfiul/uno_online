@@ -1,4 +1,4 @@
-import { Room, PublicRoomInfo, Player } from '../types';
+import { Room, PublicRoomInfo, Player, ChatMessage } from '../types';
 import { UnoGameEngine } from './unoEngine';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -47,6 +47,7 @@ export class RoomManager {
       status: 'waiting',
       maxPlayers: Math.min(Math.max(maxPlayers, 2), 8),
       createdAt: Date.now(),
+      messages: [],
     };
 
     this.rooms.set(roomId, newRoom);
@@ -235,6 +236,8 @@ export class RoomManager {
             p.isTurn = idx === nextIndex;
           });
           engine.state.turnStartTime = Date.now();
+          engine.state.hasDrawnThisTurn = false;
+          engine.state.pendingDrawCount = 0;
         }
       }
 
@@ -286,5 +289,22 @@ export class RoomManager {
 
   public getGameEngine(roomId: string): UnoGameEngine | undefined {
     return this.gameEngines.get(roomId);
+  }
+
+  public addMessage(roomId: string, message: ChatMessage): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    if (!room.messages) {
+      room.messages = [];
+    }
+    room.messages.push(message);
+    if (room.messages.length > 100) {
+      room.messages.shift();
+    }
+  }
+
+  public getMessages(roomId: string): ChatMessage[] {
+    const room = this.rooms.get(roomId);
+    return room?.messages || [];
   }
 }
