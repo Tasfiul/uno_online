@@ -2,10 +2,8 @@ import React from 'react';
 import { UnoCard, CardColor } from '../types';
 import { Eye, EyeOff, Sparkles, RefreshCw, SkipForward, LogOut, MessageSquare, Zap } from 'lucide-react';
 import { sounds } from '../services/audio';
-import { VoiceChatBar } from './VoiceChatBar';
 
 interface TopCardHUDProps {
-  roomId: string;
   topCard: UnoCard | null;
   currentColor: CardColor;
   isMyTurn: boolean;
@@ -35,7 +33,6 @@ const COLOR_MAP: Record<CardColor, { bg: string; text: string; ring: string; lab
 };
 
 export const TopCardHUD: React.FC<TopCardHUDProps> = ({
-  roomId,
   topCard,
   currentColor,
   isMyTurn,
@@ -111,7 +108,7 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
       <header className="flex flex-col gap-1 sm:gap-1.5 w-full">
         {/* Tier 1: Action & Stats Navigation Bar */}
         <div className="flex items-start justify-between gap-1 sm:gap-2 w-full flex-nowrap">
-          {/* Left Column: Top Card Widget & Voice Chat on top, Quit button cleanly below (Zero overlap on any screen) */}
+          {/* Left Column: Top Card Widget on top, Quit button cleanly below (Zero overlap on any screen) */}
           <div className="pointer-events-auto flex flex-col items-start gap-1 sm:gap-1.5 shrink-0">
             <div className="flex items-center gap-1 sm:gap-1.5">
               {/* Top Card Widget */}
@@ -156,9 +153,6 @@ export const TopCardHUD: React.FC<TopCardHUDProps> = ({
                   </div>
                 ) : null}
               </div>
-
-              {/* Voice Chat Button */}
-              <VoiceChatBar roomId={roomId} className="flex items-center" />
             </div>
 
             {/* Quit Button: Sits naturally in document flow directly beneath Top Card with guaranteed spacing */}

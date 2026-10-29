@@ -1,7 +1,7 @@
 {
   "name": "uno-online-server",
   "version": "1.0.0",
-  "description": "Multiplayer 3D Uno Game Backend Server with Voice Chat and Socket.io",
+  "description": "Multiplayer 3D Uno Game Backend Server with Socket.io",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

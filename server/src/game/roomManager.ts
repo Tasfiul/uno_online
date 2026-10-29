@@ -316,4 +316,11 @@ export class RoomManager {
     const room = this.rooms.get(roomId);
     return room?.messages || [];
   }
+
+  public clearMessages(roomId: string): void {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      room.messages = [];
+    }
+  }
 }

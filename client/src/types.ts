@@ -20,8 +20,6 @@ export interface Player {
   hasSaidUno: boolean;
   isHost: boolean;
   isConnected: boolean;
-  isMuted: boolean;
-  isSpeaking?: boolean;
 }
 
 export type GameStatus = 'waiting' | 'playing' | 'ended';
@@ -76,12 +74,6 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   isSystem?: boolean;
-}
-
-export interface VoiceSignalPayload {
-  target: string;
-  sender: string;
-  signal: any;
 }
 
 export interface CheckCallResult {

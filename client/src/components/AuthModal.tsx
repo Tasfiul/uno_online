@@ -109,7 +109,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
           </h2>
           <p className="text-sm text-slate-400 mt-1">
             {isRegister
-              ? 'Join online 3D Uno with live voice chat'
+              ? 'Join online 3D Uno with friends'
               : 'Log in to join the tables and play'}
           </p>
         </div>

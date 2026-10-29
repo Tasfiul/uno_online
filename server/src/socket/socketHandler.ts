@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { RoomManager } from '../game/roomManager';
-import { Player, ChatMessage, VoiceSignalPayload } from '../types';
+import { Player, ChatMessage } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 export function setupSocketHandler(io: Server, roomManager: RoomManager) {
@@ -21,8 +21,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
   }
   // Active room head-tracking look directions: roomId -> Map<playerId, { yaw: number, pitch: number, userId?: string }>
   const roomPlayerLooks = new Map<string, Map<string, { yaw: number; pitch: number; userId?: string }>>();
-  // Active room WebRTC voice chat members: roomId -> Set<socket.id>
-  const roomVoicePeers = new Map<string, Set<string>>();
 
   function broadcastRoomUpdate(roomId: string) {
     const room = roomManager.getRoom(roomId);
@@ -145,7 +143,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         hasSaidUno: false,
         isHost: true,
         isConnected: true,
-        isMuted: false,
       };
 
       const result = roomManager.createRoom({
@@ -165,6 +162,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       socket.join(result.room.id);
 
       socket.emit('room:created', { roomId: result.room.id });
+      socket.emit('chat:history', { messages: [] });
       broadcastRoomUpdate(result.room.id);
       io.emit('rooms:list_response', roomManager.getPublicRooms());
     });
@@ -185,7 +183,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         hasSaidUno: false,
         isHost: false,
         isConnected: true,
-        isMuted: false,
       };
 
       const result = roomManager.joinRoom({
@@ -235,7 +232,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         hasSaidUno: false,
         isHost: false,
         isConnected: true,
-        isMuted: false,
       };
 
       const result = roomManager.joinRoom({
@@ -279,6 +275,10 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         return;
       }
 
+      // Ensure room chat messages are freshly cleared for the new match
+      roomManager.clearMessages(roomId);
+      io.to(roomId).emit('chat:clear');
+
       broadcastRoomUpdate(roomId);
       broadcastGameState(roomId);
 
@@ -314,6 +314,9 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         const room = roomManager.getRoom(roomId);
         if (room) room.status = 'ended';
 
+        // Match ended: clean entire chat slate
+        roomManager.clearMessages(roomId);
+        io.to(roomId).emit('chat:clear');
         io.to(roomId).emit('game:game_over', { winner: engine.state.winner });
       }
 
@@ -431,75 +434,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       broadcastChatMessage(roomId, message);
     });
 
-    // 13. Live WebRTC Voice Chat Signaling
-    socket.on('voice:join', () => {
-      const roomId = socketRoomMap.get(socket.id);
-      if (!roomId) return;
-
-      let peersSet = roomVoicePeers.get(roomId);
-      if (!peersSet) {
-        peersSet = new Set<string>();
-        roomVoicePeers.set(roomId, peersSet);
-      }
-
-      // Return current voice peers to this joining socket (excluding themselves)
-      const existingPeers = Array.from(peersSet).filter(id => id !== socket.id);
-      socket.emit('voice:peers', { peers: existingPeers });
-
-      // Add socket to set and inform others
-      peersSet.add(socket.id);
-      socket.to(roomId).emit('voice:peer_joined', { peerId: socket.id, playerId: socket.id });
-    });
-
-    socket.on('voice:leave', () => {
-      const roomId = socketRoomMap.get(socket.id);
-      if (!roomId) return;
-
-      const peersSet = roomVoicePeers.get(roomId);
-      if (peersSet) {
-        peersSet.delete(socket.id);
-        if (peersSet.size === 0) {
-          roomVoicePeers.delete(roomId);
-        }
-      }
-      socket.to(roomId).emit('voice:peer_left', { peerId: socket.id, playerId: socket.id });
-    });
-
-    socket.on('voice:signal', (payload: VoiceSignalPayload) => {
-      if (!payload || !payload.target) return;
-      io.to(payload.target).emit('voice:signal', {
-        sender: socket.id,
-        signal: payload.signal,
-      });
-    });
-
-    socket.on('voice:mute_change', (payload: { isMuted: boolean }) => {
-      const roomId = socketRoomMap.get(socket.id);
-      const player = socketPlayerMap.get(socket.id);
-      if (player) {
-        player.isMuted = payload.isMuted;
-      }
-      if (roomId) {
-        io.to(roomId).emit('voice:mute_status', {
-          peerId: socket.id,
-          playerId: socket.id,
-          isMuted: payload.isMuted,
-        });
-      }
-    });
-
-    socket.on('voice:speaking_change', (payload: { isSpeaking: boolean }) => {
-      const roomId = socketRoomMap.get(socket.id);
-      if (roomId) {
-        socket.to(roomId).emit('voice:speaking_status', {
-          peerId: socket.id,
-          playerId: socket.id,
-          isSpeaking: payload.isSpeaking,
-        });
-      }
-    });
-
-    // 14. Realtime First-Person Head Movement / Look Tracking
+    // 13. Realtime First-Person Head Movement / Look Tracking
     socket.on('player:look', (payload: { yaw: number; pitch: number; userId?: string }) => {
       if (
         !payload ||
@@ -573,7 +508,7 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       }
     });
 
-    // 15. Explicit Action: Quit Match / Leave Room
+    // 14. Explicit Action: Quit Match / Leave Room
     socket.on('room:quit', () => {
       handleExplicitQuit(socket);
     });
@@ -591,14 +526,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
       socket.leave(roomId);
       socketRoomMap.delete(socket.id);
       socketPlayerMap.delete(socket.id);
-
-      // Notify WebRTC peers to mute/pause audio and remove from active voice
-      const voicePeers = roomVoicePeers.get(roomId);
-      if (voicePeers) {
-        voicePeers.delete(socket.id);
-        if (voicePeers.size === 0) roomVoicePeers.delete(roomId);
-      }
-      socket.to(roomId).emit('voice:peer_left', { playerId: socket.id, peerId: socket.id });
 
       const userId = player.userId;
       const targetRoom = roomManager.getRoom(roomId);
@@ -655,6 +582,8 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
           broadcastGameState(roomId);
 
           if (quitRes.gameOver && quitRes.engine?.state.winner) {
+            roomManager.clearMessages(roomId);
+            io.to(roomId).emit('chat:clear');
             io.to(roomId).emit('game:game_over', { winner: quitRes.engine.state.winner });
           }
 
@@ -678,13 +607,6 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
         clearTimeout(disconnectTimers.get(player.userId)!);
         disconnectTimers.delete(player.userId);
       }
-
-      const voicePeers = roomVoicePeers.get(roomId);
-      if (voicePeers) {
-        voicePeers.delete(sock.id);
-        if (voicePeers.size === 0) roomVoicePeers.delete(roomId);
-      }
-      sock.to(roomId).emit('voice:peer_left', { playerId: sock.id, peerId: sock.id });
 
       const roomLooks = roomPlayerLooks.get(roomId);
       if (roomLooks) {
@@ -713,6 +635,8 @@ export function setupSocketHandler(io: Server, roomManager: RoomManager) {
 
         // Requirement: "if all but one player remains, auto declare winner only then"
         if (quitRes.gameOver && quitRes.engine?.state.winner) {
+          roomManager.clearMessages(roomId);
+          io.to(roomId).emit('chat:clear');
           io.to(roomId).emit('game:game_over', { winner: quitRes.engine.state.winner });
         }
       }

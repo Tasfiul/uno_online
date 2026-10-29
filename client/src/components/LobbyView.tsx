@@ -219,7 +219,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-none">
               UNO 3D ONLINE
             </h1>
-            <span className="text-[10px] text-slate-400">Multiplayer & Live Voice</span>
+            <span className="text-[10px] text-slate-400">Multiplayer & Real-Time</span>
           </div>
         </div>
 
@@ -260,7 +260,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/10 shadow-2xl relative overflow-hidden mb-8">
           <div className="relative z-10 max-w-xl">
             <h2 className="text-2xl sm:text-4xl font-black italic tracking-tight text-white mb-2">
-              PLAY WITH FRIENDS & VOICE CHAT
+              PLAY WITH FRIENDS ONLINE
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 mb-6">
               Host a public or private room, look around the 3D table, challenge players, call UNO, and catch opponents with Check!
