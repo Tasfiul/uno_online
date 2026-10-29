@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { UnoCard, CardColor, CardType } from '../types';
 
 export function createUnoDeck(): UnoCard[] {
@@ -70,7 +71,8 @@ export function createUnoDeck(): UnoCard[] {
 export function shuffleDeck(deck: UnoCard[]): UnoCard[] {
   const shuffled = [...deck];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    // Cryptographically secure integer selection in range [0, i]
+    const j = randomInt(0, i + 1);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
