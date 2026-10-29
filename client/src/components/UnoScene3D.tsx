@@ -231,14 +231,21 @@ function getCuteFaceTexture(): THREE.CanvasTexture {
 
 // Procedural 2D Solid Badge Texture for Floating Player Info with User Avatar Image & Name
 function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTexture {
+  const logicalWidth = 460;
+  const logicalHeight = 124;
+  const scale = 2.5; // High-DPI crisp scale (1150x310) for sharp text and avatars on mobile & desktop without GPU lag
+  const FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
   const canvas = document.createElement('canvas');
-  canvas.width = 460;
-  canvas.height = 124;
+  canvas.width = Math.round(logicalWidth * scale);
+  canvas.height = Math.round(logicalHeight * scale);
   const ctx = canvas.getContext('2d')!;
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 4;
 
   const effectiveUrl =
     player.avatar && (player.avatar.startsWith('data:') || player.avatar.startsWith('http'))
@@ -248,10 +255,15 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
   function render(avatarImg?: HTMLImageElement) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
     // 1. Solid opaque rounded badge background
     ctx.fillStyle = isTurn ? '#0284c7' : '#0f172a';
     ctx.beginPath();
-    ctx.roundRect(6, 6, canvas.width - 12, canvas.height - 12, 22);
+    ctx.roundRect(6, 6, logicalWidth - 12, logicalHeight - 12, 22);
     ctx.fill();
 
     // Solid crisp border
@@ -259,29 +271,73 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
     ctx.strokeStyle = isTurn ? '#facc15' : '#38bdf8';
     ctx.stroke();
 
-    // 2. User Avatar in Circular Frame on the Left
-    const cx = 64;
-    const cy = 62;
-    const r = 44;
+    // Measure name and layout dynamically so [Avatar + Name] are centered together
+    const avatarRadius = 40;
+    const avatarDiameter = avatarRadius * 2; // 80px
+    const gap = 14; // gap between avatar and text
+    const minPadding = 18;
+    const maxTextWidth = logicalWidth - (minPadding * 2) - avatarDiameter - gap; // ~330px max
 
+    let displayName = player.username;
+    let nameFontSize = isTurn ? 32 : 36;
+    ctx.font = `bold ${nameFontSize}px ${FONT_FAMILY}`;
+
+    // Fit long names within maxTextWidth
+    while (ctx.measureText(displayName).width > maxTextWidth && nameFontSize > 18) {
+      nameFontSize -= 2;
+      ctx.font = `bold ${nameFontSize}px ${FONT_FAMILY}`;
+    }
+    if (ctx.measureText(displayName).width > maxTextWidth) {
+      while (ctx.measureText(displayName + '…').width > maxTextWidth && displayName.length > 2) {
+        displayName = displayName.slice(0, -1);
+      }
+      displayName += '…';
+    }
+
+    const nameWidth = ctx.measureText(displayName).width;
+
+    let turnBannerWidth = 0;
+    const turnBannerText = '★ CURRENT TURN ★';
+    const turnBannerFontSize = 16;
+    if (isTurn) {
+      ctx.font = `bold ${turnBannerFontSize}px ${FONT_FAMILY}`;
+      turnBannerWidth = ctx.measureText(turnBannerText).width;
+    }
+
+    const textBlockWidth = isTurn ? Math.max(nameWidth, turnBannerWidth) : nameWidth;
+    const totalContentWidth = avatarDiameter + gap + textBlockWidth;
+
+    // Center the entire [Avatar + Text] block horizontally inside the badge
+    const startX = Math.max(minPadding, (logicalWidth - totalContentWidth) / 2);
+    const cx = startX + avatarRadius;
+    const cy = logicalHeight / 2; // 62
+    const textStartX = startX + avatarDiameter + gap;
+
+    // 2. User Avatar in Circular Frame
     ctx.save();
     // Inner dark circle
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.arc(cx, cy, avatarRadius, 0, Math.PI * 2);
     ctx.fillStyle = '#1e293b';
     ctx.fill();
 
     if (avatarImg && avatarImg.complete && avatarImg.naturalWidth > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, r - 2, 0, Math.PI * 2);
+      ctx.arc(cx, cy, avatarRadius - 2, 0, Math.PI * 2);
       ctx.clip();
-      ctx.drawImage(avatarImg, cx - (r - 2), cy - (r - 2), (r - 2) * 2, (r - 2) * 2);
+      ctx.drawImage(
+        avatarImg,
+        cx - (avatarRadius - 2),
+        cy - (avatarRadius - 2),
+        (avatarRadius - 2) * 2,
+        (avatarRadius - 2) * 2
+      );
       ctx.restore();
     } else {
       // Clean fallback initial
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 44px sans-serif';
+      ctx.font = `bold 42px ${FONT_FAMILY}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(player.username.charAt(0).toUpperCase(), cx, cy);
@@ -289,45 +345,43 @@ function createBadgeTexture(player: Player, isTurn: boolean): THREE.CanvasTextur
 
     // Glowing avatar border ring
     ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.lineWidth = 4;
+    ctx.arc(cx, cy, avatarRadius, 0, Math.PI * 2);
+    ctx.lineWidth = isTurn ? 4 : 3.5;
     ctx.strokeStyle = isTurn ? '#facc15' : '#38bdf8';
     ctx.stroke();
     ctx.restore();
 
-    // 3. Player Name & Status on the Right (starting at x = 124)
+    // 3. Player Name & Status (centered with avatar)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1.5;
+
     if (isTurn) {
       // Golden turn banner at top
       ctx.fillStyle = '#facc15';
-      ctx.font = 'bold 18px sans-serif';
+      ctx.font = `bold ${turnBannerFontSize}px ${FONT_FAMILY}`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillText('★ CURRENT TURN ★', 124, 42);
+      ctx.fillText(turnBannerText, textStartX, 44);
 
       // Username below banner
-      let fontSize = 34;
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      while (ctx.measureText(player.username).width > 310 && fontSize > 18) {
-        fontSize -= 2;
-        ctx.font = `bold ${fontSize}px sans-serif`;
-      }
       ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${nameFontSize}px ${FONT_FAMILY}`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillText(player.username, 124, 88);
+      ctx.fillText(displayName, textStartX, 88);
     } else {
       // Username vertically centered
-      let fontSize = 38;
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      while (ctx.measureText(player.username).width > 310 && fontSize > 18) {
-        fontSize -= 2;
-        ctx.font = `bold ${fontSize}px sans-serif`;
-      }
       ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${nameFontSize}px ${FONT_FAMILY}`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(player.username, 124, 62);
+      ctx.fillText(displayName, textStartX, cy);
     }
+
+    ctx.restore(); // restore shadow
+    ctx.restore(); // restore scale
 
     tex.needsUpdate = true;
   }
@@ -1008,8 +1062,8 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
     rendererRef.current = renderer;
     renderer.setSize(width, height);
 
-    // Limit DPR on mobile to 1.25 (or 1.5 max on wide tablets), 1.75 on desktop
-    const maxDpr = isMobile ? (window.innerWidth < 500 ? 1.25 : 1.5) : 1.75;
+    // Crisp, balanced DPR: 1.5 on mobile phones, 1.75 on tablets/desktops
+    const maxDpr = isMobile ? (window.innerWidth < 500 ? 1.5 : 1.75) : 1.75;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
@@ -1191,7 +1245,7 @@ export const UnoScene3D: React.FC<UnoScene3DProps> = ({ gameState, myPlayerId, m
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(w, h);
       const isMob = typeof navigator !== 'undefined' && (/mobile|android|iphone|ipad|tablet/i.test(navigator.userAgent) || window.innerWidth < 768);
-      const maxD = isMob ? (window.innerWidth < 500 ? 1.25 : 1.5) : 1.75;
+      const maxD = isMob ? (window.innerWidth < 500 ? 1.5 : 1.75) : 1.75;
       rendererRef.current.setPixelRatio(Math.min(window.devicePixelRatio, maxD));
     };
     window.addEventListener('resize', handleResize);
